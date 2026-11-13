@@ -113,7 +113,7 @@ class ParseTests(unittest.TestCase):
 
     def test_haversine(self):
         self.assertAlmostEqual(haversine_m(40, -3.7, 41, -3.7), M_PER_DEG_LAT, delta=1)
-        self.assertEqual(STEP_M, 10)
+        self.assertEqual(STEP_M, 5)
 
 
 class StoreTests(unittest.TestCase):

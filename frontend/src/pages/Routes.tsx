@@ -104,7 +104,7 @@ export function Routes({ data }: { data: Telemetry | null }) {
                 {active?.active && r.file === current
                   ? <RouteProfile profile={active.profile} progressKm={data?.routeProgressKm ?? active.progressKm} compact />
                   : previews[r.file] && <RouteProfile profile={previews[r.file]} progressKm={null} compact />}
-                {!!r.clippedSteps && <p className="tiny warn">El GPX tenía {r.clippedSteps} tramos de 10 m imposibles (fuera de −15 … +20 %): se han recortado.</p>}
+                {!!r.clippedSteps && <p className="tiny warn">El GPX tenía {r.clippedSteps} tramos de 5 m imposibles (fuera de −15 … +20 %): se han recortado.</p>}
                 <div className="admin-actions">
                   <button className="primary" disabled={busy || !listing.available || r.file === current} onClick={() => void ride(r)}>
                     {r.file === current ? 'Rodando' : 'Rodar esta ruta'}

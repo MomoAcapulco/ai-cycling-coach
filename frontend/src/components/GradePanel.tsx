@@ -41,6 +41,13 @@ export function GradePanel({ data, onError }: { data: Telemetry | null; onError:
   useEffect(() => () => window.clearTimeout(timer.current), []);
   const onTrainer = data?.gradeControlMode === 'TRAINER';
   const onRoute = !!data?.routeFile && !data?.routeFinished;
+  // Progress towards what was asked: the road moves by distance, so on a slow climb it takes a while. Shown so it
+  // never looks stuck. Not on a route (there the target changes all the time with the profile).
+  const road = data?.roadGradePercent ?? null;
+  const holding = onTrainer && data?.gradeStatus === 'HOLD_NOT_PEDALLING';
+  const gap = target != null && road != null ? Math.abs(target - road) : 0;
+  const progress = !onRoute && (gap >= 0.05 || holding)
+    ? { metres: gap * (data?.gradeTransitionMetersPerPercent ?? 20) } : null;
   const leaveRoute = async () => {
     setBusy(true);
     try { await api.stopRoute(); onError(''); }
@@ -99,9 +106,16 @@ export function GradePanel({ data, onError }: { data: Telemetry | null; onError:
         <button disabled={busy || onRoute} onClick={() => { window.clearTimeout(timer.current); setPending(0); void send(0); }}>Llano 0 %</button>
         <button disabled={onRoute || current >= MAX} onClick={() => press(STEP)}>+0,5 %</button>
       </div>
+      {progress && (
+        <p className={`grade-progress ${holding ? 'warn' : ''}`}>
+          {holding
+            ? <>Parado: al volver a pedalear seguirá hacia {pct(target)}.</>
+            : <>Carretera {pct(road)} → {pct(target)} · faltan ~{fmt(progress.metres, 0)} m</>}
+        </p>
+      )}
       <div className={`grade-figures ${onTrainer ? 'three' : ''}`}>
         <div><span>Carretera</span><strong>{pct(data?.roadGradePercent)}</strong></div>
-        {onTrainer && <div><span>Rodillo</span><strong>{pct(data?.effectiveGradePercent)}</strong></div>}
+        {onTrainer && <div><span>Rodillo ({data?.gradeDifficultyPercent ?? '—'} %)</span><strong>{pct(data?.effectiveGradePercent)}</strong></div>}
         {onTrainer && (
           <div><span>{data?.gradeConfirmed ? 'Aplicada ✓' : 'Enviada · sin confirmar'}</span>
             <strong>{pct(data?.gradeConfirmed ? data?.appliedGradePercent : data?.sentGradePercent)}</strong></div>

@@ -1,4 +1,4 @@
-"""A GPX route as a road profile: distance, elevation and grade every 10 m, to ride on the virtual road.
+"""A GPX route as a road profile: distance, elevation and grade every 5 m, to ride on the virtual road.
 
 Reading (standard library only):
 - GPX 1.0 or 1.1, track points (``trk/trkseg/trkpt``) or, if there are none, route points (``rte/rtept``);
@@ -7,14 +7,22 @@ Reading (standard library only):
   store (coach/app/routes_store.py).
 
 Profile:
-- Resampled every ``STEP_M`` (10 m) by linear interpolation along the distance.
-- GPX elevation is noisy (GPS, or a DEM sampled point by point): it is smoothed with a moving average over
-  ``SMOOTH_M`` (100 m) before computing grades (window chosen by measurement, not taken from another tool). Measured on a synthetic route with ±1.5 m of
-  noise every 20 m: a flat road shows spikes up to 5.5 % with 50 m, under 3 % with 100 m; a real change of grade
-  is spread over ~80 m, less than the road's own transition (1 % every 20 m), so real ramps are not flattened.
-- Grade of each 10 m step from the smoothed elevation, clipped to what the rider may ask
-  (grade_controller.TARGET_RANGE, -15 … +20 %); how many steps were clipped is reported.
-- Elevation gain = sum of the rises of the smoothed profile.
+- Resampled every ``STEP_M`` (5 m) by linear interpolation along the distance. Measured: 10 m blurred a real
+  1→5 % ramp over 80 m, 5 m keeps it within 70 m and a short roller felt as 1.4 % instead of 1.3 %; a 100 km
+  route still takes ~0.02 s.
+- GPX elevation is noisy (GPS, or a DEM sampled point by point), so it is smoothed before use. Two profiles:
+  * GRADE (what the rider feels), method of Serpentine (MIT, chrisperkles/serpentine src/geo/route.ts @e4f2126):
+    a ±30 m moving average applied 3 times (the window shrinks symmetrically at the ends, which keeps a constant
+    slope), then the grade at each point is the central difference over ±20 m (40 m). Compared with our first
+    method (one 100 m average, grade per 10 m step) on synthetic routes: false spikes on a noisy flat road
+    1.3 % instead of 2.1 %, a real 1→5 % ramp kept within 70 m instead of 80 m, same mean on a 6 % climb; a
+    short 100 m roller of 2 % is felt as 1.4 % instead of 1.6 % (the price of less noise).
+  * ELEVATION and GAIN (the chart and the summary): one centred ``SMOOTH_M`` (100 m) average, reflected at the
+    ends; gain = sum of its rises. Unchanged on purpose: no method measured (ours, Serpentine's 1 m threshold,
+    GoldenCheetah's 3 m threshold, gpxpy's light smoothing) was best both with GPS noise and with small real
+    rollers; to be decided with real race GPX files against their official gain.
+- Grades are clipped to what the rider may ask (grade_controller.TARGET_RANGE, -15 … +20 %); how many 5 m steps
+  were clipped is reported.
 
 On the virtual road (coach/session/virtual_ride.py) the TARGET grade is the profile's grade at the distance
 ridden since the route started; the road grade still moves towards it by at most 1 % every 20 m, so even a
@@ -26,8 +34,11 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from typing import List, Optional
 
-STEP_M = 10.0
-SMOOTH_M = 100.0
+STEP_M = 5.0
+SMOOTH_M = 100.0            # elevation and gain profile
+GRADE_SMOOTH_RADIUS_M = 30.0  # grade profile (Serpentine): ±30 m average …
+GRADE_SMOOTH_PASSES = 3       # … applied 3 times …
+GRADE_HALF_BASE_M = 20.0      # … then central difference over ±20 m
 MIN_DISTANCE_M = 200.0
 MAX_POINTS = 200_000
 EARTH_RADIUS_M = 6_371_000
@@ -136,12 +147,7 @@ def parse_gpx(data: bytes, file: str = 'route.gpx') -> Route:
     elevations = _smooth(raw, int(SMOOTH_M // STEP_M))
     low, high = TARGET_RANGE
     grades, clipped = [], 0
-    for i in range(len(elevations) - 1):
-        run = min(STEP_M, total - i * STEP_M)
-        if run < STEP_M / 2 and grades:
-            grades.append(grades[-1])   # a last step of a few cm: its "grade" is noise, keep the previous one
-            continue
-        grade = (elevations[i + 1] - elevations[i]) / run * 100
+    for grade in _grades(raw, total):
         if not low <= grade <= high:
             clipped += 1
             grade = min(high, max(low, grade))
@@ -165,6 +171,37 @@ def _resample(distances, elevations, total):
         e0, e1 = elevations[j], elevations[j + 1]
         out.append(e0 if d1 == d0 else e0 + (e1 - e0) * (d - d0) / (d1 - d0))
     return out
+
+
+def _smooth_shrinking(values, radius, passes):
+    """Serpentine's running mean: ±``radius`` samples, ``passes`` times; at the ends the window shrinks
+    symmetrically, so the end points stay put and a constant slope is kept."""
+    a = list(values)
+    for _ in range(passes):
+        prefix = [0.0]
+        for v in a:
+            prefix.append(prefix[-1] + v)
+        out = []
+        for i in range(len(a)):
+            r = min(radius, i, len(a) - 1 - i)
+            out.append((prefix[i + r + 1] - prefix[i - r]) / (2 * r + 1))
+        a = out
+    return a
+
+
+def _grades(raw, total):
+    """Grade (%) of each STEP_M step: smoothed elevation, central difference over ±GRADE_HALF_BASE_M at each point
+    (real distances, so a short last step is not a spike), then the mean of the step's two end points."""
+    ele = _smooth_shrinking(raw, round(GRADE_SMOOTH_RADIUS_M / STEP_M), GRADE_SMOOTH_PASSES)
+    n = len(ele)
+    position = [min(i * STEP_M, total) for i in range(n)]
+    half = max(1, round(GRADE_HALF_BASE_M / STEP_M))
+    at_point = []
+    for i in range(n):
+        a, b = max(0, i - half), min(n - 1, i + half)
+        run = position[b] - position[a]
+        at_point.append((ele[b] - ele[a]) / run * 100 if run > 0 else 0.0)
+    return [(at_point[i] + at_point[i + 1]) / 2 for i in range(n - 1)]
 
 
 def _smooth(values, window):

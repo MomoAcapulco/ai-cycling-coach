@@ -8,8 +8,8 @@ copied code, but we credit every project we learned from.
 
 | Project | License | What |
 |---|---|---|
-| [chrisperkles/serpentine](https://github.com/chrisperkles/serpentine) @e4f2126 | MIT | Zwift protocol message layout, scaling and handshake, ported to Python in `trainer-adapter/coach/devices/zwift_hub.py`; virtual-shifting timings (80 ms merge, 10 s grade refresh) |
-| [incyclist/devices](https://github.com/incyclist/devices) @07e0035 | MIT | cross-check of the same protocol; HubRequest 512; 0.01 % instead of 0 %; Zwift type bytes and FTMS priority in discovery |
+| [chrisperkles/serpentine](https://github.com/chrisperkles/serpentine) @e4f2126 | MIT | Zwift protocol message layout, scaling and handshake, ported to Python in `trainer-adapter/coach/devices/zwift_hub.py`; virtual-shifting timings (80 ms merge, 10 s grade refresh); route grade method (3 passes of a ±30 m mean, grade over ±20 m, `src/geo/route.ts`) re-implemented in `trainer-adapter/coach/session/route.py` |
+| [incyclist/devices](https://github.com/incyclist/devices) @07e0035 | MIT | cross-check of the same protocol; HubRequest 512; Zwift type bytes and FTMS priority in discovery; cross-check of the speed-from-power model (`src/utils/calculations.ts`) |
 | [jat255/zwift_click_handling](https://github.com/jat255/zwift_click_handling) @7cf896d | MIT | Zwift Click handshake and battery field (`trainer-adapter/tools/zwift_click_v36.py`) |
 
 ## Projects used as references only (no code taken)
@@ -22,6 +22,8 @@ copied code, but we credit every project we learned from.
 | [cagnulein/qdomyos-zwift](https://github.com/cagnulein/qdomyos-zwift) | GPL-3.0 | ideas only |
 | [JuergenLeber/SHIFTR](https://github.com/JuergenLeber/SHIFTR) | GPL-3.0 | ideas only (same gear table) |
 | [ajchellew/zwiftplay](https://github.com/ajchellew/zwiftplay) | no license | ideas only: protocol documentation |
+| [tkrajina/gpxpy](https://github.com/tkrajina/gpxpy) @056cdfc | Apache-2.0 | compared only: elevation gain with light smoothing |
+| [GoldenCheetah/GoldenCheetah](https://github.com/GoldenCheetah/GoldenCheetah) @0cf3acc | GPL-2.0 | compared only (idea): elevation gain with a 3 m hysteresis |
 
 ---
 

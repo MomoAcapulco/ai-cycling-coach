@@ -7,6 +7,9 @@ speed is just the flywheel's. Zwift likewise takes the speed from the power and 
 publicly; its code is closed).
 Validated in the grade test (diagnostics/zwift_grade_test_20261113_123554.json): at the same power and grade the
 speeds below are within ~1 km/h of the trainer's own in steady riding, and CdA 0.40 fits best of 0.25-0.40.
+Cross-checked with Incyclist (MIT, incyclist/devices src/utils/calculations.ts @07e0035): same equation; it uses
+cwA 0.35 (an average 1.80 m / 75 kg rider), Crr 0.0036, rho 1.2041 and no inertia. Same speeds on climbs
+(200 W, 89.5 kg, 8 %: 9.6 km/h both), ours ~5 % slower on the flat (CdA 0.40, chosen by the trainer data).
 
 Model (forces along the road, SI units):
   drive   P / max(v, 1 m/s)                        (the floor keeps the start-up force finite)
