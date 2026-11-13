@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+.idea/
+.DS_Store
+backend/target/
+frontend/node_modules/
+frontend/dist/
+*.log
+.env
+
+.run/
+
+# Private raw ride recordings must stay on the user's machine
+trainer-adapter/recordings/

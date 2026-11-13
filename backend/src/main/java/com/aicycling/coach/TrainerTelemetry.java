@@ -1,0 +1,40 @@
+package com.aicycling.coach;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+public record TrainerTelemetry(
+        String source,
+        int powerWatts,
+        double cadenceRpm,
+        double speedKph,
+        long elapsedSeconds,
+        boolean connected,
+        String status,
+        Double lastUpdateSeconds,
+        String error,
+        Integer heartRateBpm,
+        boolean heartRateConnected,
+        String heartRateStatus,
+        Double heartRateLastUpdateSeconds,
+        String heartRateError,
+        Double targetGradePercent,
+        Double gradePercent,
+        Double estimatedDistanceKm,
+        Double mechanicalWorkKj,
+        String controlStatus,
+        String experimentPhase,
+        Boolean zwiftLeftConnected,
+        Boolean zwiftRightConnected,
+        String zwiftLeftStatus,
+        String zwiftRightStatus,
+        Integer virtualGear,
+        Integer virtualGearCount,
+        String lastButton,
+        String lastButtonSide,
+        Integer buttonPressCount,
+        String gearControlMode,
+        Double virtualGearRelativeRatio,
+        Boolean replayPlaying,
+        Double replaySpeed,
+        Double replayDurationSeconds) {}
