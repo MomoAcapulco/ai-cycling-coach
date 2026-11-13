@@ -1,15 +1,32 @@
+# ---- Dependencies and build output (rebuilt by init.sh / start.sh) ----
 .venv/
 __pycache__/
 *.pyc
-.idea/
-.DS_Store
+.pytest_cache/
+*.egg-info/
 backend/target/
 frontend/node_modules/
 frontend/dist/
+frontend/.vite/
+
+# ---- Editors and OS ----
+.idea/
+.vscode/
+.DS_Store
+
+# ---- Local runtime state ----
 *.log
-.env
-
 .run/
+*.tmp
+*.zip
 
-# Private raw ride recordings must stay on the user's machine
+# ---- Private: never in the repository ----
+# Local configuration (device IDs of this Mac, ports). .env.example is the shared template.
+.env
+# Private raw ride recordings must stay on the user's machine (they live in ../ai-cycling-coach-data/).
 trainer-adapter/recordings/
+# Output of the diagnostic tools (scans of everything around, trainer inventory, test runs).
+diagnostics/
+
+# tests/fixtures DOES go in: a few recorded packets the tests need, with every device identifier, serial and name
+# masked by scripts/mask_personal_data.py. Run it (with --check) before committing new recordings.

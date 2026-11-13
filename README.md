@@ -1,55 +1,86 @@
-# AI Cycling Coach v4.1 — Dashboard, Replay y marchas virtuales (sin control físico)
+# AI Cycling Coach
 
-Versión **completa**, no parche. No sobrescribir v4 ni v2.
+Panel de entrenamiento local para rodillo inteligente (Wahoo KICKR CORE 2), pulsómetro y mandos Zwift.
+Todo funciona en tu ordenador (`127.0.0.1`); ningún dato sale de él.
 
-## Instalación en Mac
+Versión actual: ver `VERSION`. Novedades de cada versión: `CHANGELOG.md`.
 
-1. Descomprimir el ZIP en `~/dev/` como `ai-cycling-coach-v4.1/`.
-2. Conservar las carpetas de versiones anteriores, en especial las grabaciones.
-3. Copiar recordings adicionales sin sobrescribir archivos existentes:
+## Arrancar
 
-   ```bash
-   cp -n ~/dev/ai-cycling-coach-v4/trainer-adapter/recordings/* \
-     ~/dev/ai-cycling-coach-v4.1/trainer-adapter/recordings/ 2>/dev/null || true
-   ```
-
-4. Usar `.env` incluido. `TRAINER_MODE=REPLAY`, `CONTROL_TEST_ENABLED=false`, `ZWIFT_ENABLED=false`.
-5. Arrancar:
-
-   ```bash
-   cd ~/dev/ai-cycling-coach-v4.1
-   chmod +x start.sh scripts/*.sh
-   python3 -m venv trainer-adapter/.venv
-   trainer-adapter/.venv/bin/python -m pip install -r trainer-adapter/requirements.txt
-   ./start.sh
-   ```
-
-6. Abrir `http://127.0.0.1:5173`.
-
-**REPLAY no conecta al rodillo ni envía órdenes FTMS.** En el modo replay los botones de UI cambian solo la marcha virtual representada (1–24); modelo de relación relativa *ilustrativo*, no replica la tabla de Zwift ni se traduce a resistencia. Para usar los dos mandos físicos en modo visual, activar `ZWIFT_ENABLED=true` y configurar sus identificadores, sin otras órdenes al KICKR.
-
-## Novedades
-
-- Endpoint Python `/replay/session`: 600 registros íntegros para los gráficos, sin depender de cuándo se abra React.
-- Endpoint Python `POST /replay/control`: `play`, `pause`, `restart`, `seek` y `speed` (0.5, 1, 2, 4).
-- Endpoint Python `POST /replay/gear`: cambios visuales +1/-1, únicamente en modo REPLAY.
-- API Spring Boot reenvía los tres endpoints bajo `/api/trainer/replay/...`.
-- React: perfil de pendiente ordenada con tramo desconocido, línea temporal, reproductor, gráficos de potencia/pulso/cadencia de sesión completa, potencia suavizada tres segundos, estadísticas y marchas virtuales.
-- Control del Wahoo sin cambios desde v4. No se ha habilitado el cambio físico. No se repite automáticamente el experimento de pendientes mientras REPLAY esté activo.
-
-## Verificación realizada
-
-- 31 pruebas unitarias de Python: OK.
-- Prueba HTTP real de `/health`, `/replay/session`, pausa, salto al segundo 420, lectura de pendiente (2 %) y cambio virtual al 13: OK.
-- Parseo TypeScript/TSX con compilador TypeScript global: sin errores sintácticos.
-- **Pendiente de probar en tu Mac:** `npm install` y `npm run build` para verificar dependencias y compilación completa; prueba end-to-end React + Java.
-
-## Si algo falla
-
-```bash
-cd ~/dev/ai-cycling-coach-v4.1/frontend
-npm install
-npm run build
+```sh
+cd ~/dev/ai-cycling-coach-v4.3.0
+bash init.sh --start
 ```
 
-Comparte el error exacto antes de modificar archivos. Mantén las grabaciones y `.env` de versiones antiguas intactos.
+`init.sh` comprueba Python, Node, Java y Maven, prepara dependencias, compila y arranca. Las siguientes veces basta con `./start.sh`.
+
+Abre `http://127.0.0.1:5173`. En el **Panel** inicias, pausas y terminas las sesiones; en **Sesiones** las ves, descargas y reproduces. En **Ajustes** eliges la fuente de datos (rodillo real, replay o simulador), subes grabaciones, activas pulsómetro y mandos, y rellenas tu perfil.
+
+La aplicación lleva una **carretera virtual**: la velocidad se calcula con física a partir de tus vatios y tu peso (la del rodillo no baja al subir), y con ella la distancia, la altitud y el desnivel acumulado. La pendiente la eliges tú y cambia según avanzas, como en una carretera. Puedes probarla sin rodillo en el simulador: `docs/pruebas/PRUEBA-pendiente-en-el-simulador.md`.
+
+## Tus datos
+
+En `~/dev/ai-cycling-coach-data/`, **junto a** las carpetas de versión: cada versión nueva los encuentra sin copiar nada, y se pueden compartir para analizarlos. Lo que hubiera en el antiguo `~/.ai-cycling-coach/` se copia allí al arrancar (sin sobrescribir ni borrar). Otra carpeta: `AI_COACH_HOME` en `.env`.
+
+| Qué | Dónde |
+|---|---|
+| Sesiones (CSV + resumen + captura opcional) y grabaciones para replay | `ai-cycling-coach-data/recordings/` |
+| Resultados de las herramientas de diagnóstico (para compartirlos) | `diagnostics/` dentro del proyecto |
+| Dispositivos recordados | `ai-cycling-coach-data/devices.json` |
+| Ajustes guardados desde la web | `ai-cycling-coach-data/settings.json` |
+| Perfil del ciclista | `ai-cycling-coach-data/profile.json` |
+
+`.env` da los valores por defecto (copia de `.env.example` en la primera instalación). Lo guardado en Ajustes manda sobre `.env` hasta que pulses «Volver a .env».
+
+## Estructura
+
+```
+├── README.md  CHANGELOG.md  VERSION
+├── init.sh  start.sh  .env.example
+├── scripts/            utilidades de shell (carga de .env, comprobaciones, importar grabaciones)
+├── docs/
+│   ├── adr/            decisiones de arquitectura
+│   ├── pruebas/        guías paso a paso para probar con el hardware
+│   └── blog/
+├── frontend/           React + TypeScript (Vite)
+│   └── src/            api.ts, hooks.ts, types.ts, format.ts, components/, pages/
+├── backend/            Java 21 + Spring Boot: API /api/trainer/** que reenvía al adaptador
+└── trainer-adapter/    Python + Bleak: Bluetooth, replay, grabación
+    ├── server.py       punto de entrada
+    ├── coach/
+    │   ├── app/        servidor HTTP, runtime (cambio de modo en caliente), ajustes, perfil, grabaciones
+    │   ├── bluetooth/  bucle BLE único, autodescubrimiento, búsqueda y registro de dispositivos
+    │   ├── devices/    rodillo (FTMS), pulsómetro, mandos Zwift
+    │   └── session/    grabación CSV, replay, captura en bruto, marchas virtuales
+    ├── tools/          diagnóstico de solo lectura (discovery.py, trainer_probe.py, sondas antiguas de mandos)
+    └── tests/          pruebas unitarias (fixtures: paquetes reales grabados)
+```
+
+## Pruebas
+
+```sh
+cd trainer-adapter && .venv/bin/python -m unittest discover -s tests -t .
+cd backend && mvn test
+cd frontend && npm run build
+```
+
+## Herramientas de diagnóstico (no envían nada a los dispositivos)
+
+```sh
+trainer-adapter/.venv/bin/python trainer-adapter/tools/discovery.py --seconds 15     # qué hay alrededor
+trainer-adapter/.venv/bin/python trainer-adapter/tools/trainer_probe.py --seconds 15 # inventario del rodillo
+```
+
+Los resultados se guardan en la carpeta `diagnostics/` del proyecto (para compartirlos). Guías completas en `docs/pruebas/`.
+
+## Seguridad
+
+No hay control físico del rodillo salvo el experimento supervisado `CONTROL_TEST_ENABLED` (solo en `.env`, desactivado por defecto). Las marchas virtuales actuales son solo visuales.
+
+## Licencia
+
+MIT (`LICENSE`). Parte del protocolo Zwift está portada de Serpentine (MIT); los créditos y las licencias de los
+proyectos de los que aprendimos están en `THIRD_PARTY_NOTICES.md`.
+
+Antes de añadir grabaciones nuevas a `tests/fixtures`, enmascara los identificadores de tus dispositivos:
+`python3 scripts/mask_personal_data.py`.

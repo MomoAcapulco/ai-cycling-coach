@@ -1,0 +1,1 @@
+{"root":["./src/api.ts","./src/format.ts","./src/hooks.ts","./src/main.tsx","./src/types.ts","./src/vite-env.d.ts","./src/components/Charts.tsx","./src/components/GradePanel.tsx","./src/components/Panels.tsx","./src/components/ProfileSection.tsx","./src/components/SessionBar.tsx","./src/pages/Admin.tsx","./src/pages/Dashboard.tsx","./src/pages/Sessions.tsx"],"version":"5.9.3"}

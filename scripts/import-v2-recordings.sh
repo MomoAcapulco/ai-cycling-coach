@@ -3,7 +3,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 OLD="${1:-$HOME/dev/ai-cycling-coachV2}"
 SOURCE="$OLD/trainer-adapter/recordings"
-DEST="$HERE/trainer-adapter/recordings"
+DEST="${RECORD_DIR:-${AI_COACH_HOME:-$(cd "$HERE/.." && pwd)/ai-cycling-coach-data}/recordings}"
 if [[ ! -d "$SOURCE" ]]; then
   echo "No se encontró: $SOURCE" >&2
   exit 1

@@ -1,0 +1,546 @@
+{
+  "scannedAtUtc": "2026-11-12T12:49:49+00:00",
+  "devices": [
+    {
+      "classified": {
+        "kind": "heart_rate",
+        "address": "FA4E0000-0000-4000-8000-0DAC79FCEBF0",
+        "name": "HR50-0000000",
+        "side": null,
+        "zwift_model": null,
+        "zwift_type": null,
+        "reason": "service 180d"
+      },
+      "advert": {
+        "address": "FA4E0000-0000-4000-8000-0DAC79FCEBF0",
+        "name": "HR50-0000000",
+        "serviceUuids": [
+          "0000180d-0000-1000-8000-00805f9b34fb",
+          "0000180f-0000-1000-8000-00805f9b34fb",
+          "0000180a-0000-1000-8000-00805f9b34fb"
+        ],
+        "manufacturerData": {},
+        "rssi": -80
+      }
+    },
+    {
+      "classified": {
+        "kind": "zwift",
+        "address": "FA4E0000-0000-4000-8000-C4F41263D137",
+        "name": "Zwift Click",
+        "side": "left",
+        "zwift_model": "CLICK_V2",
+        "zwift_type": 11,
+        "reason": "zwift type 0x0B"
+      },
+      "advert": {
+        "address": "FA4E0000-0000-4000-8000-C4F41263D137",
+        "name": "Zwift Click",
+        "serviceUuids": [
+          "0000fc82-0000-1000-8000-00805f9b34fb"
+        ],
+        "manufacturerData": {
+          "0x094A": "0ba469"
+        },
+        "rssi": -55
+      }
+    },
+    {
+      "classified": {
+        "kind": "zwift",
+        "address": "FA4E0000-0000-4000-8000-5A32B13A42DE",
+        "name": "Zwift Click",
+        "side": "right",
+        "zwift_model": "CLICK_V2",
+        "zwift_type": 10,
+        "reason": "zwift type 0x0A"
+      },
+      "advert": {
+        "address": "FA4E0000-0000-4000-8000-5A32B13A42DE",
+        "name": "Zwift Click",
+        "serviceUuids": [
+          "0000fc82-0000-1000-8000-00805f9b34fb"
+        ],
+        "manufacturerData": {
+          "0x094A": "0a3ed8"
+        },
+        "rssi": -46
+      }
+    },
+    {
+      "classified": {
+        "kind": "unknown",
+        "address": "FA4E0000-0000-4000-8000-DD88C44EDC92",
+        "name": null,
+        "side": null,
+        "zwift_model": null,
+        "zwift_type": null,
+        "reason": "no known service"
+      },
+      "advert": {
+        "address": "FA4E0000-0000-4000-8000-DD88C44EDC92",
+        "name": null,
+        "serviceUuids": [],
+        "manufacturerData": {},
+        "rssi": -91
+      }
+    },
+    {
+      "classified": {
+        "kind": "unknown",
+        "address": "FA4E0000-0000-4000-8000-A6FCEE64BDE0",
+        "name": null,
+        "side": null,
+        "zwift_model": null,
+        "zwift_type": null,
+        "reason": "no known service"
+      },
+      "advert": {
+        "address": "FA4E0000-0000-4000-8000-A6FCEE64BDE0",
+        "name": null,
+        "serviceUuids": [],
+        "manufacturerData": {
+          "0x004C": "1006391de9b00368"
+        },
+        "rssi": -58
+      }
+    },
+    {
+      "classified": {
+        "kind": "unknown",
+        "address": "FA4E0000-0000-4000-8000-2F67CF4FE543",
+        "name": null,
+        "side": null,
+        "zwift_model": null,
+        "zwift_type": null,
+        "reason": "no known service"
+      },
+      "advert": {
+        "address": "FA4E0000-0000-4000-8000-2F67CF4FE543",
+        "name": null,
+        "serviceUuids": [],
+        "manufacturerData": {
+          "0x004C": "02152686f39cbada4658854aa62e7e5e8b8d000100000b"
+        },
+        "rssi": -92
+      }
+    },
+    {
+      "classified": {
+        "kind": "unknown",
+        "address": "FA4E0000-0000-4000-8000-6108A0343724",
+        "name": null,
+        "side": null,
+        "zwift_model": null,
+        "zwift_type": null,
+        "reason": "no known service"
+      },
+      "advert": {
+        "address": "FA4E0000-0000-4000-8000-6108A0343724",
+        "name": null,
+        "serviceUuids": [],
+        "manufacturerData": {},
+        "rssi": -85
+      }
+    },
+    {
+      "classified": {
+        "kind": "unknown",
+        "address": "FA4E0000-0000-4000-8000-8C83ED30A0D6",
+        "name": null,
+        "side": null,
+        "zwift_model": null,
+        "zwift_type": null,
+        "reason": "no known service"
+      },
+      "advert": {
+        "address": "FA4E0000-0000-4000-8000-8C83ED30A0D6",
+        "name": null,
+        "serviceUuids": [],
+        "manufacturerData": {
+          "0x004C": "03161100000277c0a801710000000000000000000000000b"
+        },
+        "rssi": -91
+      }
+    },
+    {
+      "classified": {
+        "kind": "unknown",
+        "address": "FA4E0000-0000-4000-8000-F4E19BA8BE11",
+        "name": null,
+        "side": null,
+        "zwift_model": null,
+        "zwift_type": null,
+        "reason": "no known service"
+      },
+      "advert": {
+        "address": "FA4E0000-0000-4000-8000-F4E19BA8BE11",
+        "name": null,
+        "serviceUuids": [],
+        "manufacturerData": {
+          "0x004C": "07190500551000000146081d8c73ae2cce93e8505a0d3a8c9c4dca"
+        },
+        "rssi": -73
+      }
+    },
+    {
+      "classified": {
+        "kind": "unknown",
+        "address": "FA4E0000-0000-4000-8000-3D3C193835EB",
+        "name": null,
+        "side": null,
+        "zwift_model": null,
+        "zwift_type": null,
+        "reason": "no known service"
+      },
+      "advert": {
+        "address": "FA4E0000-0000-4000-8000-3D3C193835EB",
+        "name": null,
+        "serviceUuids": [],
+        "manufacturerData": {
+          "0x004C": "1006321acb5aacfb"
+        },
+        "rssi": -94
+      }
+    },
+    {
+      "classified": {
+        "kind": "unknown",
+        "address": "FA4E0000-0000-4000-8000-1DC257CCE46B",
+        "name": null,
+        "side": null,
+        "zwift_model": null,
+        "zwift_type": null,
+        "reason": "no known service"
+      },
+      "advert": {
+        "address": "FA4E0000-0000-4000-8000-1DC257CCE46B",
+        "name": null,
+        "serviceUuids": [],
+        "manufacturerData": {
+          "0x0006": "01092022d90c011e12eaf644107012050ab30b48c6af7086c305f4"
+        },
+        "rssi": -86
+      }
+    },
+    {
+      "classified": {
+        "kind": "unknown",
+        "address": "FA4E0000-0000-4000-8000-9F1B2610F591",
+        "name": null,
+        "side": null,
+        "zwift_model": null,
+        "zwift_type": null,
+        "reason": "no known service"
+      },
+      "advert": {
+        "address": "FA4E0000-0000-4000-8000-9F1B2610F591",
+        "name": null,
+        "serviceUuids": [],
+        "manufacturerData": {
+          "0x004C": "12021401"
+        },
+        "rssi": -67
+      }
+    },
+    {
+      "classified": {
+        "kind": "unknown",
+        "address": "FA4E0000-0000-4000-8000-A6087FCE646F",
+        "name": null,
+        "side": null,
+        "zwift_model": null,
+        "zwift_type": null,
+        "reason": "no known service"
+      },
+      "advert": {
+        "address": "FA4E0000-0000-4000-8000-A6087FCE646F",
+        "name": null,
+        "serviceUuids": [
+          "0000180a-0000-1000-8000-00805f9b34fb",
+          "fa4e0000-0000-4000-8000-886bc23bee8e"
+        ],
+        "manufacturerData": {},
+        "rssi": -94
+      }
+    },
+    {
+      "classified": {
+        "kind": "unknown",
+        "address": "FA4E0000-0000-4000-8000-676B91B5E12A",
+        "name": null,
+        "side": null,
+        "zwift_model": null,
+        "zwift_type": null,
+        "reason": "no known service"
+      },
+      "advert": {
+        "address": "FA4E0000-0000-4000-8000-676B91B5E12A",
+        "name": null,
+        "serviceUuids": [],
+        "manufacturerData": {},
+        "rssi": -92
+      }
+    },
+    {
+      "classified": {
+        "kind": "unknown",
+        "address": "FA4E0000-0000-4000-8000-282A79B7F9D3",
+        "name": null,
+        "side": null,
+        "zwift_model": null,
+        "zwift_type": null,
+        "reason": "no known service"
+      },
+      "advert": {
+        "address": "FA4E0000-0000-4000-8000-282A79B7F9D3",
+        "name": null,
+        "serviceUuids": [],
+        "manufacturerData": {
+          "0x0006": "010f2022a0fa2443f71eaa29b9a10e7a98411406f0617bea8f38d5"
+        },
+        "rssi": -93
+      }
+    },
+    {
+      "classified": {
+        "kind": "unknown",
+        "address": "FA4E0000-0000-4000-8000-1EFA4CF6E41D",
+        "name": null,
+        "side": null,
+        "zwift_model": null,
+        "zwift_type": null,
+        "reason": "no known service"
+      },
+      "advert": {
+        "address": "FA4E0000-0000-4000-8000-1EFA4CF6E41D",
+        "name": null,
+        "serviceUuids": [],
+        "manufacturerData": {
+          "0x004C": "12020003"
+        },
+        "rssi": -94
+      }
+    },
+    {
+      "classified": {
+        "kind": "unknown",
+        "address": "FA4E0000-0000-4000-8000-4410884D2ACC",
+        "name": null,
+        "side": null,
+        "zwift_model": null,
+        "zwift_type": null,
+        "reason": "no known service"
+      },
+      "advert": {
+        "address": "FA4E0000-0000-4000-8000-4410884D2ACC",
+        "name": null,
+        "serviceUuids": [],
+        "manufacturerData": {
+          "0x004C": "071905005510000001098a6ac9bcd7559ea3734aac2dd571f8a429"
+        },
+        "rssi": -69
+      }
+    },
+    {
+      "classified": {
+        "kind": "unknown",
+        "address": "FA4E0000-0000-4000-8000-1ED99B949811",
+        "name": null,
+        "side": null,
+        "zwift_model": null,
+        "zwift_type": null,
+        "reason": "no known service"
+      },
+      "advert": {
+        "address": "FA4E0000-0000-4000-8000-1ED99B949811",
+        "name": null,
+        "serviceUuids": [],
+        "manufacturerData": {
+          "0x0006": "010f20225a07db2d801432e3f3245d67cc8ff5316b39ff2c62070f"
+        },
+        "rssi": -88
+      }
+    },
+    {
+      "classified": {
+        "kind": "unknown",
+        "address": "FA4E0000-0000-4000-8000-E51AC1C942DB",
+        "name": null,
+        "side": null,
+        "zwift_model": null,
+        "zwift_type": null,
+        "reason": "no known service"
+      },
+      "advert": {
+        "address": "FA4E0000-0000-4000-8000-E51AC1C942DB",
+        "name": null,
+        "serviceUuids": [],
+        "manufacturerData": {
+          "0x004C": "160800931bf368158eaf"
+        },
+        "rssi": -85
+      }
+    },
+    {
+      "classified": {
+        "kind": "unknown",
+        "address": "FA4E0000-0000-4000-8000-D52D67ECB2BE",
+        "name": null,
+        "side": null,
+        "zwift_model": null,
+        "zwift_type": null,
+        "reason": "no known service"
+      },
+      "advert": {
+        "address": "FA4E0000-0000-4000-8000-D52D67ECB2BE",
+        "name": null,
+        "serviceUuids": [],
+        "manufacturerData": {
+          "0x004C": "1005791c48c1d8"
+        },
+        "rssi": -85
+      }
+    },
+    {
+      "classified": {
+        "kind": "unknown",
+        "address": "FA4E0000-0000-4000-8000-53F2C0CEDB35",
+        "name": null,
+        "side": null,
+        "zwift_model": null,
+        "zwift_type": null,
+        "reason": "no known service"
+      },
+      "advert": {
+        "address": "FA4E0000-0000-4000-8000-53F2C0CEDB35",
+        "name": null,
+        "serviceUuids": [],
+        "manufacturerData": {
+          "0x004C": "1007271fc8e94c0178"
+        },
+        "rssi": -94
+      }
+    },
+    {
+      "classified": {
+        "kind": "unknown",
+        "address": "FA4E0000-0000-4000-8000-72FCA89CD452",
+        "name": null,
+        "side": null,
+        "zwift_model": null,
+        "zwift_type": null,
+        "reason": "no known service"
+      },
+      "advert": {
+        "address": "FA4E0000-0000-4000-8000-72FCA89CD452",
+        "name": null,
+        "serviceUuids": [],
+        "manufacturerData": {
+          "0x004C": "12020001"
+        },
+        "rssi": -95
+      }
+    },
+    {
+      "classified": {
+        "kind": "unknown",
+        "address": "FA4E0000-0000-4000-8000-880957E794F0",
+        "name": "Nearby TV",
+        "side": null,
+        "zwift_model": null,
+        "zwift_type": null,
+        "reason": "no known service"
+      },
+      "advert": {
+        "address": "FA4E0000-0000-4000-8000-880957E794F0",
+        "name": "Nearby TV",
+        "serviceUuids": [],
+        "manufacturerData": {
+          "0x0075": "420401806604cb018db9cd06cb018db9cc0106df317add05"
+        },
+        "rssi": -81
+      }
+    },
+    {
+      "classified": {
+        "kind": "unknown",
+        "address": "FA4E0000-0000-4000-8000-5B92B288D1A6",
+        "name": "Nearby device",
+        "side": null,
+        "zwift_model": null,
+        "zwift_type": null,
+        "reason": "no known service"
+      },
+      "advert": {
+        "address": "FA4E0000-0000-4000-8000-5B92B288D1A6",
+        "name": "Nearby device",
+        "serviceUuids": [
+          "0000fd50-0000-1000-8000-00805f9b34fb"
+        ],
+        "manufacturerData": {},
+        "rssi": -94
+      }
+    },
+    {
+      "classified": {
+        "kind": "unknown",
+        "address": "FA4E0000-0000-4000-8000-653347DCAD33",
+        "name": "Nearby TV",
+        "side": null,
+        "zwift_model": null,
+        "zwift_type": null,
+        "reason": "no known service"
+      },
+      "advert": {
+        "address": "FA4E0000-0000-4000-8000-653347DCAD33",
+        "name": "Nearby TV",
+        "serviceUuids": [],
+        "manufacturerData": {
+          "0x0075": "4204018060c048e6b9ca6bc248e6b9ca6a01c07500000000"
+        },
+        "rssi": -94
+      }
+    },
+    {
+      "classified": {
+        "kind": "unknown",
+        "address": "FA4E0000-0000-4000-8000-51D565F70FDE",
+        "name": "Nearby TV",
+        "side": null,
+        "zwift_model": null,
+        "zwift_type": null,
+        "reason": "no known service"
+      },
+      "advert": {
+        "address": "FA4E0000-0000-4000-8000-51D565F70FDE",
+        "name": "Nearby TV",
+        "serviceUuids": [],
+        "manufacturerData": {
+          "0x0075": "4204018066f4fefb32700bf6fefb32700a01000000000000"
+        },
+        "rssi": -79
+      }
+    },
+    {
+      "classified": {
+        "kind": "unknown",
+        "address": "FA4E0000-0000-4000-8000-4E8837D531C5",
+        "name": "Nearby TV",
+        "side": null,
+        "zwift_model": null,
+        "zwift_type": null,
+        "reason": "no known service"
+      },
+      "advert": {
+        "address": "FA4E0000-0000-4000-8000-4E8837D531C5",
+        "name": "Nearby TV",
+        "serviceUuids": [],
+        "manufacturerData": {
+          "0x0075": "42040180664cc95e1f85414ec95e1f854001a49400000000"
+        },
+        "rssi": -78
+      }
+    }
+  ]
+}

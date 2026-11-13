@@ -5,7 +5,7 @@ cd "$ROOT"
 info() { printf '\n==> %s\n' "$*"; }
 fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 for file in frontend/package.json backend/pom.xml trainer-adapter/requirements.txt start.sh; do
-  [[ -f "$file" ]] || fail "Falta $file. Copia init.sh a la raiz del proyecto completo v4.2."
+  [[ -f "$file" ]] || fail "Falta $file. Copia init.sh a la raiz del proyecto completo."
 done
 for cmd in python3 node npm java mvn; do
   command -v "$cmd" >/dev/null 2>&1 || fail "Falta instalar $cmd"
@@ -20,7 +20,14 @@ if [[ ! -f .env ]]; then
 else
   info 'Conservando .env'
 fi
-mkdir -p trainer-adapter/recordings
+# User data lives outside the version folders (see trainer-adapter/coach/app/paths.py).
+DATA_HOME="${AI_COACH_HOME:-$(cd "$ROOT/.." && pwd)/ai-cycling-coach-data}"
+RECORDINGS="${RECORD_DIR:-$DATA_HOME/recordings}"
+mkdir -p "$RECORDINGS"
+if [[ -d trainer-adapter/recordings ]] && compgen -G 'trainer-adapter/recordings/*' >/dev/null; then
+  info "Copiando grabaciones de esta carpeta a $RECORDINGS (sin sobrescribir; los originales se quedan)"
+  cp -n trainer-adapter/recordings/* "$RECORDINGS"/ 2>/dev/null || true
+fi
 info 'Conservando todas las grabaciones existentes'
 chmod u+x start.sh
 if [[ -d scripts ]]; then find scripts -maxdepth 1 -type f -name '*.sh' -exec chmod u+x {} +; fi
@@ -36,7 +43,7 @@ info 'Compilando backend Java'
 cd "$ROOT/backend"
 mvn -q -DskipTests package
 info 'Inicializacion terminada'
-printf 'Proyecto: %s\nGrabaciones: %s/trainer-adapter/recordings\n' "$ROOT" "$ROOT"
+printf 'Proyecto: %s\nGrabaciones: %s\n' "$ROOT" "$RECORDINGS"
 if [[ ${1:-} == --start ]]; then
   info 'Arrancando AI Cycling Coach'
   cd "$ROOT"
