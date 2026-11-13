@@ -194,3 +194,68 @@ export function ElevationProfile({ points, current, fullView }: { points: Sample
 }
 
 const fmtMinutes = (t: number) => (t < 60 ? `${Math.round(t)} s` : `${fmt(t / 60, t % 60 ? 1 : 0)} min`);
+
+/**
+ * The whole route ahead, coloured by grade, with the rider's position: like a race profile. Used in the Panel
+ * while a route is ridden and, small, in the Rutas page.
+ */
+export function RouteProfile({ profile, progressKm, title, compact = false }: {
+  profile: { d: number; e: number; g: number }[]; progressKm: number | null; title?: string; compact?: boolean;
+}) {
+  if (profile.length < 2) return null;
+  const H = compact ? 90 : 215, left = compact ? 6 : 46, right = 12, top = 10, base = compact ? 84 : 172;
+  const total = Math.max(0.1, profile[profile.length - 1].d);
+  const elevations = profile.map((p) => p.e);
+  const minE = Math.min(...elevations), maxE = Math.max(minE + 20, ...elevations);
+  const step = niceStep(maxE - minE);
+  const lo = Math.floor(minE / step) * step, hi = Math.ceil(maxE / step) * step;
+  const x = (d: number) => left + (d / total) * (W - left - right);
+  const y = (e: number) => base - ((e - lo) / (hi - lo || 1)) * (base - top);
+  const at = progressKm == null ? null : Math.min(progressKm, total);
+  const here = at == null ? null : profile.reduce((best, p) => (Math.abs(p.d - at) < Math.abs(best.d - at) ? p : best), profile[0]);
+  const grid: number[] = [];
+  for (let e = lo; e <= hi + 1e-9; e += step) grid.push(e);
+  const kmStep = [0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50].find((s) => total / s <= 8) ?? 100;
+  const kmTicks: number[] = [];
+  for (let k = 0; k <= total + 1e-9; k += kmStep) kmTicks.push(Math.round(k * 10) / 10);
+  const svg = (
+    <svg role="img" aria-label="Perfil de la ruta" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+      {!compact && grid.map((e) => (
+        <g key={e}>
+          <line x1={left} x2={W - right} y1={y(e)} y2={y(e)} stroke="#38504b" strokeDasharray="4 5" />
+          <text x={left - 8} y={y(e) + 4} textAnchor="end" fill="#94aaa5" fontSize="11">{fmt(e, 0)} m</text>
+        </g>
+      ))}
+      {profile.slice(1).map((p, i) => {
+        const a = profile[i];
+        const done = at != null && p.d <= at;
+        return <path key={p.d} d={`M${x(a.d)},${base} L${x(a.d)},${y(a.e)} L${x(p.d)},${y(p.e)} L${x(p.d)},${base} Z`}
+          fill={gradeColor(a.g)} opacity={done ? 0.25 : 0.6} />;
+      })}
+      <path d={profile.map((p, i) => `${i ? 'L' : 'M'}${x(p.d).toFixed(1)},${y(p.e).toFixed(1)}`).join(' ')} stroke="#e8f1ee" strokeWidth="1.4" fill="none" />
+      {at != null && <line x1={x(at)} x2={x(at)} y1={top} y2={base} stroke="#f6c180" strokeWidth="2.5" />}
+      {!compact && kmTicks.map((k) => (
+        <text key={k} x={x(k)} y={base + 20} fontSize="11" textAnchor="middle" fill="#9eafa9">{fmt(k, kmStep < 1 ? 1 : 0)} km</text>
+      ))}
+    </svg>
+  );
+  if (compact) return <div className="route-mini">{svg}</div>;
+  return (
+    <div className="grade-profile">
+      <div className="profile-top">
+        <div>
+          <h2>{title ?? 'Ruta'}</h2>
+          <p>{at == null ? `${fmt(total, 1)} km` : `${fmt(at, 2)} de ${fmt(total, 1)} km · quedan ${fmt(total - at, 2)} km`}</p>
+        </div>
+        <strong>{fmt(here?.g ?? null, 1)} <small>%</small></strong>
+      </div>
+      {svg}
+      <div className="profile-legend">
+        {GRADE_BANDS.map(([from, color, label]) => (
+          <span key={String(from)}><span className="swatch" style={{ background: color }} /> {label}</span>
+        ))}
+        <span>│ Tu posición</span>
+      </div>
+    </div>
+  );
+}

@@ -43,8 +43,15 @@ export type Telemetry = {
   vamMh?: number | null;
   wattsPerKg?: number | null;
   gradeTransitionMetersPerPercent?: number;
+  routeFile?: string | null;
+  routeName?: string | null;
+  routeDistanceKm?: number | null;
+  routeProgressKm?: number | null;
+  routeFinished?: boolean | null;
   effectiveGradePercent?: number | null;
   sentGradePercent?: number | null;
+  appliedGradePercent?: number | null;
+  gradeConfirmed?: boolean;
   gradeStatus?: string;
   gradeDifficultyPercent?: number;
   gradeDescentFactorPercent?: number;
@@ -174,6 +181,25 @@ export type RememberedDevice = {
   lastUsedAtUtc?: string | null;
   preferred?: boolean;
 };
+
+export type RouteSummary = {
+  file: string;
+  name: string;
+  valid: boolean;
+  error: string | null;
+  distanceKm?: number;
+  elevationGainM?: number;
+  elevationLossM?: number;
+  maxGradePercent?: number;
+  minGradePercent?: number;
+  clippedSteps?: number;
+  points?: number;
+};
+
+/** The route being ridden: summary plus the profile for the chart (d km, e m, g % of the next step). */
+export type ActiveRoute = { active: false } | (RouteSummary & {
+  active: true; progressKm: number; finished: boolean; profile: { d: number; e: number; g: number }[];
+});
 
 export type DeviceRole = 'trainer' | 'heart_rate' | 'zwift_left' | 'zwift_right';
 

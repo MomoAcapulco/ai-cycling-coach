@@ -9,8 +9,7 @@ src/devices/zwift.ts @e4f2126), cross-checked with Incyclist (MIT). Every messag
 - HubCommand (type 0x04): field 3 power target (W); field 4 Simulation {1 wind m/s×100 (sint),
   2 incline %×100 (sint), 3 CWa×10000, 4 Crr×100000}; field 5 Physical {2 gear ratio×10000,
   4 bike kg×100, 5 rider kg×100}. A gear is sent as a RATIO, not an index.
-- HubRequest (type 0x00): field 1 data id; 520 asks for the gear ratio. Incyclist also asks 512 (meaning not
-  documented): the grade test (tools/zwift_grade_test.py) records what our trainer answers.
+- HubRequest (type 0x00): field 1 data id; 520 asks for the gear ratio, 512 for the simulation state (below).
 - RidingData (type 0x03), 1 Hz: 1 power W, 2 cadence rpm, 3 speed in m/s×100 (cm/s), 4 heart rate,
   plus 5 and 6 whose meaning is not documented (kept raw as unknown5/unknown6).
 
@@ -25,7 +24,20 @@ Measured in the gear test (diagnostics/zwift_gear_test_20261112_155523.json):
 - HubRequest 520 is answered on SyncTx with type 0x3C {1: 520, 2: {1: {8: gear ratio×10000}}}: the ratio the
   trainer actually APPLIED (24000 for gear 12, 26099 for 13, 22200 for 11). This is the confirmation to use.
 - Field 6 of RidingData stayed 23003 whatever the gear: it is not the gear.
-- In Zwift mode the FTMS speed is the virtual speed: cadence × ratio × ~2.1 m (60 rpm × 2.40 ≈ 18.2 km/h).
+- In Zwift mode the FTMS speed is the trainer's virtual speed: in steady riding cadence × ratio × ~2.1 m
+  (60 rpm × 2.40 ≈ 18.2 km/h), with inertia when it changes.
+
+Measured in the grade test (diagnostics/zwift_grade_test_20261113_123554.json):
+- HubRequest 512 is answered (~0.3 s) with type 0x3C {1: 512, 2: {1: {6: incline %×100 (sint, zigzag),
+  7: the RidingData "unknown6" value, 8: gear ratio×10000, 12: rider kg×100 as sent, 13: Crr×100000, …}}}.
+  Field 6 equalled the grade sent 7 times out of 7 (0.4, 1.0, 1.5, 1.0, 0.4, 0.0, 0.4 %): it is the grade the
+  trainer APPLIED, the grade confirmation.
+- An exact 0 % is applied and confirmed, and gears keep being confirmed and felt at 0 %: the 0.01 % that
+  Incyclist sends instead is not needed on this trainer.
+- A gear message (Physical only) keeps the grade: re-sending gear 12 at 1.5 % did not drop the power to the
+  0.4 % level.
+- The trainer's virtual speed follows its own physics for the grade it applies, with inertia. At the same power
+  and grade, coach/session/virtual_ride.py gives speeds within ~1 km/h of it (CdA 0.40 fits best of 0.25-0.40).
 """
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
@@ -46,6 +58,7 @@ RIDE_ON = b'RideOn'
 RIDE_ON_TRAINER = RIDE_ON + bytes([0x02, 0x01])
 TRAINER_HANDSHAKE_2 = bytes([0x41, 0x08, 0x05])
 DATA_ID_GEAR_RATIO = 520
+DATA_ID_SIMULATION = 512   # answer carries the applied grade (field 6), see the module docstring
 
 # Zwift's 24 virtual gears (same table in Serpentine, Incyclist and SHIFTR). Gear 12 = 2.40 is neutral.
 GEAR_RATIOS = (0.75, 0.87, 0.99, 1.11, 1.23, 1.38, 1.53, 1.68, 1.86, 2.04, 2.22, 2.40,
@@ -219,7 +232,8 @@ OP_HUB_RESPONSE = 0x3C
 
 
 def decode_hub_response(msg: bytes) -> Optional[dict]:
-    """Type 0x3C, the answer to a HubRequest. For data id 520 it carries the applied gear ratio."""
+    """Type 0x3C, the answer to a HubRequest: the applied gear ratio (520 and 512) and, for 512, the applied
+    grade (``inclineX100``)."""
     if not msg or msg[0] != OP_HUB_RESPONSE:
         return None
     out = {}
@@ -232,6 +246,8 @@ def decode_hub_response(msg: bytes) -> Optional[dict]:
                     for n2, w2, v2 in decode_fields(v):
                         if n2 == 8 and w2 == 0:
                             out['gearRatioX10000'] = v2
+                        elif n2 == 6 and w2 == 0:
+                            out['inclineX100'] = unzigzag(v2)
     return out
 
 

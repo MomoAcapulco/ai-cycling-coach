@@ -205,6 +205,8 @@ async def bluetooth_worker(store, stop_event, device_id=None,
                             def on_zwift(_sender, data):
                                 raw = bytes(data)
                                 shifter.on_message(raw)
+                                if grade is not None:
+                                    grade.on_message(raw)   # answers to HubRequest 512: the applied grade
                                 if capture:
                                     capture.event('zwift', raw)
                             for uuid in (ZWIFT_ASYNC, ZWIFT_SYNC_TX):

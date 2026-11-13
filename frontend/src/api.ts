@@ -1,3 +1,4 @@
+import type { ActiveRoute, RouteSummary } from './types';
 import type { AdminState, DevicesState, ProfileState, Recording, RiderProfile, Session, SessionSummary, Settings, Telemetry } from './types';
 
 const BASE = '/api/trainer';
@@ -72,6 +73,16 @@ export const api = {
   forgetDevice: (role: string, address?: string) =>
     request<DevicesState>(`/devices/${role}${address ? `?address=${encodeURIComponent(address)}` : ''}`, { method: 'DELETE' }),
   useDevice: (role: string, address: string) => request<DevicesState>(`/devices/${role}/use`, json({ address })),
+  routes: () => request<{ routes: RouteSummary[]; folder: string; current: string | null; available: boolean }>('/routes'),
+  uploadRoute: (file: File) =>
+    request<RouteSummary>(`/routes?name=${encodeURIComponent(file.name)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/gpx+xml' }, body: file,
+    }),
+  route: () => request<ActiveRoute>('/route'),
+  routePreview: (file: string) =>
+    request<RouteSummary & { profile: { d: number; e: number; g: number }[] }>(`/routes/${encodeURIComponent(file)}`),
+  startRoute: (file: string) => request<RouteSummary>('/route/start', json({ file })),
+  stopRoute: () => request<{ active: false }>('/route/stop', { method: 'POST' }),
 };
 
 /** URL that downloads a finished session's file (the browser saves it). */

@@ -207,6 +207,34 @@ class Handler(BaseHTTPRequestHandler):
         if path == '/session':
             self.respond(self.session.snapshot() if self.session is not None else {'sessionState': 'UNAVAILABLE'})
             return
+        if path == '/routes' and self.admin is not None:
+            from coach.app.routes_store import list_routes
+            ride = state.ride
+            self.respond({'routes': list_routes(self.admin.env.routes_dir), 'folder': str(self.admin.env.routes_dir),
+                          'current': ride.route.file if ride is not None and ride.route is not None else None,
+                          'available': self.route_unavailable() is None})
+            return
+        if path.startswith('/routes/') and self.admin is not None:
+            # one route's profile, to look at it before choosing it
+            from coach.app.routes_store import load_route
+            from coach.session.route import RouteError
+            from urllib.parse import unquote
+            try:
+                route = load_route(self.admin.env.routes_dir, unquote(path[len('/routes/'):]))
+            except (FileNotFoundError, RouteError):
+                self.send_error(404, 'Route not found or not usable')
+                return
+            self.respond({**route.summary(), 'profile': route.profile()})
+            return
+        if path == '/route':
+            ride = state.ride
+            if ride is None or ride.route is None:
+                self.respond({'active': False})
+                return
+            snap = ride.snapshot()
+            self.respond({'active': True, **ride.route.summary(), 'profile': ride.route.profile(),
+                          'progressKm': snap['routeProgressKm'], 'finished': snap['routeFinished']})
+            return
         if path == '/sessions' and self.admin is not None:
             from coach.session.session import list_sessions
             self.respond({'sessions': list_sessions(self.admin.env.record_dir)})
@@ -245,6 +273,13 @@ class Handler(BaseHTTPRequestHandler):
             'status': 'UP', 'mode': state.mode, 'trainerConnected': reading['connected'],
             'trainerStatus': reading['status']}
         self.respond(data)
+
+    def route_unavailable(self):
+        """Why the grade (by hand or from a route) cannot be chosen now, or None."""
+        state = self.state
+        if state.ride is None or (state.mode != 'SIMULATOR' and state.grade is None):
+            return 'Grade control needs the simulator, or the real trainer with gear control on'
+        return None
 
     def devices_json(self):
         """Known devices per role (best first), candidates waiting for a choice, and .env filters."""
@@ -316,6 +351,35 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if path == '/admin/settings/reset' and self.admin is not None:
                 self.respond(self.admin.reset_to_env())
+                return
+            if path == '/routes' and self.admin is not None:
+                from coach.app.routes_store import MAX_UPLOAD_BYTES as MAX_GPX, save_upload as save_route
+                name = (parse_qs(urlsplit(self.path).query).get('name') or [''])[0]
+                self.respond(save_route(self.admin.env.routes_dir, name, self.read_body(MAX_GPX)), 201)
+                return
+            if path in ('/route/start', '/route/stop') and self.admin is not None:
+                reason = self.route_unavailable()
+                if reason:
+                    self.send_error(409, reason)
+                    return
+                if path == '/route/stop':
+                    self.state.ride.stop_route()
+                    self.respond({'active': False})
+                    return
+                from coach.app.routes_store import load_route
+                from coach.session.route import RouteError
+                file = self.read_json().get('file')
+                if not isinstance(file, str):
+                    raise ValueError('file must be the name of a route')
+                try:
+                    route = load_route(self.admin.env.routes_dir, file)
+                except FileNotFoundError:
+                    self.send_error(404, 'Route not found')
+                    return
+                except RouteError as exc:
+                    raise ValueError(f'Not a usable GPX route: {exc}')
+                self.state.ride.start_route(route)
+                self.respond({'active': True, **route.summary()})
                 return
             if path == '/admin/recordings' and self.admin is not None:
                 from coach.app.recordings_store import MAX_UPLOAD_BYTES, save_upload

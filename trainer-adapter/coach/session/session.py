@@ -20,7 +20,7 @@ from coach.session.recording import FIELDS
 SESSION_FIELDS = FIELDS + ['trainerGear', 'requestedGear', 'gearStatus', 'virtualGear',
                            'effectiveGradePercent', 'sentGradePercent', 'gradeStatus',
                            'roadGradePercent', 'rideSpeedKph', 'rideDistanceKm', 'altitudeM', 'elevationGainM',
-                           'vamMh', 'wattsPerKg']
+                           'vamMh', 'wattsPerKg', 'routeName', 'routeProgressKm']
 MAX_SESSION_SECONDS = 4 * 3600
 SAMPLE_SECONDS = 1.0
 

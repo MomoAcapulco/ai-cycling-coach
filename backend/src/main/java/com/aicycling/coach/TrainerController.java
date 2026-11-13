@@ -70,10 +70,11 @@ public class TrainerController {
     }
 
     /**
-     * Admin page and device registry, passed through as they are: GET/POST/DELETE on /admin/** and
-     * /devices/**, query string included (recording upload uses ?name=), body and Content-Type kept.
+     * Admin page, device registry, sessions and GPX routes, passed through as they are: GET/POST/DELETE,
+     * query string included (recording and route uploads use ?name=), body and Content-Type kept.
      */
-    @RequestMapping(value = {"/admin/**", "/devices", "/devices/**", "/session", "/session/**", "/sessions"},
+    @RequestMapping(value = {"/admin/**", "/devices", "/devices/**", "/session", "/session/**", "/sessions",
+            "/routes", "/routes/**", "/route", "/route/**"},
             method = {RequestMethod.GET, RequestMethod.POST, RequestMethod.DELETE})
     public ResponseEntity<JsonNode> admin(HttpServletRequest servletRequest,
                                           @RequestBody(required = false) byte[] body) {

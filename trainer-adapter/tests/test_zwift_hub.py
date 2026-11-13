@@ -67,6 +67,16 @@ class ZwiftHubCodecTests(unittest.TestCase):
                 self.assertEqual(decode_hub_response(bytes.fromhex(hex_msg)), {'dataId': 520, 'gearRatioX10000': ratio})
                 self.assertEqual(describe(bytes.fromhex(hex_msg))['type'], 'HubResponse')
 
+    def test_simulation_answer_carries_the_applied_grade(self):
+        from coach.devices.zwift_hub import decode_hub_response
+        from tests.test_grade_controller import simulation_answer
+        for x100 in (40, 0, -150, 1000):
+            with self.subTest(x100=x100):
+                answer = decode_hub_response(simulation_answer(x100))
+                self.assertEqual((answer['dataId'], answer['inclineX100'], answer['gearRatioX10000']), (512, x100, 24000))
+        from tests.test_gear_shifter import confirmation
+        self.assertNotIn('inclineX100', decode_hub_response(confirmation(12)))   # a gear answer (520) has no grade
+
     def test_trainer_log(self):
         msg = bytes.fromhex('2a080112' + '1e' + '221c') + b'ZP: No handler for opcode 65\x00'
         self.assertEqual(describe(msg), {'type': 'TrainerLog', 'level': 1, 'text': 'ZP: No handler for opcode 65'})

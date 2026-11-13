@@ -9,12 +9,17 @@ const LIVE_HISTORY = 3600; // one hour of 1 Hz samples
 /**
  * Polls /telemetry every second. On errors it backs off (1, 2, 4, 8 s) instead of hammering a
  * stopped adapter, and recovers by itself. Live (non-replay) samples are kept as history.
+ *
+ * During a training session the history is THE SESSION: it starts empty at «Iniciar sesión» and its time axis is
+ * the session time (pauses excluded). Without a session it shows the free riding since the adapter started. The
+ * last session stays on screen after «Terminar» until a new one starts.
  */
 export function useTelemetry() {
   const [data, setData] = useState<Telemetry | null>(null);
   const [error, setError] = useState('');
   const [history, setHistory] = useState<Sample[]>([]);
   const lastMode = useRef<string | undefined>(undefined);
+  const lastSession = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {
     let alive = true;
@@ -32,9 +37,15 @@ export function useTelemetry() {
           lastMode.current = d.mode;
           setHistory([]);
         }
-        if (d.source !== 'REPLAY' && d.connected) {
+        const inSession = d.sessionState === 'RUNNING' || d.sessionState === 'PAUSED';
+        if (inSession && d.session && d.session !== lastSession.current) {
+          setHistory([]);                     // a new session: its charts start empty, at 0:00
+        }
+        if (inSession) lastSession.current = d.session ?? null;   // after «Terminar» it remembers the last one
+        const idleAfterSession = !inSession && !!lastSession.current;  // keep the finished session on screen
+        if (d.source !== 'REPLAY' && d.connected && !idleAfterSession) {
           const sample: Sample = {
-            t: d.elapsedSeconds, power: d.powerWatts, heart: d.heartRateBpm, cadence: d.cadenceRpm,
+            t: inSession ? Math.round(d.sessionElapsedSeconds ?? 0) : d.elapsedSeconds, power: d.powerWatts, heart: d.heartRateBpm, cadence: d.cadenceRpm,
             speed: d.rideSpeedKph ?? d.speedKph, grade: d.roadGradePercent ?? d.targetGradePercent ?? null,
             effective: d.effectiveGradePercent ?? null, distance: d.rideDistanceKm ?? null, altitude: d.altitudeM ?? null,
           };
@@ -57,13 +68,13 @@ export function useTelemetry() {
   return { data, error, history };
 }
 
-export type Route = 'panel' | 'sesiones' | 'ajustes';
+export type Route = 'panel' | 'rutas' | 'sesiones' | 'ajustes';
 
-/** Minimal hash router: #/ajustes, #/sesiones, anything else is the panel. */
+/** Minimal hash router: #/rutas, #/sesiones, #/ajustes, anything else is the panel. */
 export function useRoute(): Route {
   const read = (): Route => {
     const page = window.location.hash.replace(/^#\/?/, '');
-    return page === 'ajustes' || page === 'sesiones' ? page : 'panel';
+    return page === 'ajustes' || page === 'sesiones' || page === 'rutas' ? page : 'panel';
   };
   const [route, setRoute] = useState<Route>(read);
   useEffect(() => {

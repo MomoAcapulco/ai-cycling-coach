@@ -5,9 +5,9 @@ Lo que se puede hacer y probar sin el rodillo, en orden. Lo que necesita el rodi
 
 | # | Tarea | Estado |
 |---|---|---|
-| 1 | **Repositorio git**: `scripts/init-git-repo.sh`; guía en `GIT-crear-repositorio.md` | Lo estás creando tú (el script ya acepta el repositorio vacío que creaste a mano) |
+| 1 | **Repositorio git**: público en github.com/MomoAcapulco/ai-cycling-coach, MIT, historial limpio | Hecho (13-11) |
 | 2 | **Autodescubrimiento con varios dispositivos**: recordar todos los de cada tipo y no adivinar cuando hay varios desconocidos | Hecho (tests); falta probarlo con bandas reales (abajo) |
-| 3 | **GPX de una carrera**: la pendiente sigue el perfil real según avanzas por la carretera virtual | Pendiente: dime qué carrera y pasa su GPX |
+| 3 | **Rutas GPX**: subirlas, guardarlas, ver su perfil y elegir cuál rodar | Hecho (tests y simulador); falta probarlo tú con un GPX real (abajo) |
 | 4 | **Exportar a FIT y validar las métricas** contra intervals.icu o GoldenCheetah (NP, TSS, desnivel) | Pendiente |
 | 5 | **Test de FTP** (rampa o 20 min) como primer entrenamiento guiado | Pendiente |
 | 6 | **Entrenamientos estructurados**: bloques con objetivo de vatios, primero sin ERG | Pendiente |
@@ -42,3 +42,17 @@ Con la aplicación arrancada (`./start.sh`), en **Ajustes**: modo **Simulador** 
    - Ponte la HR50 y pulsa «Usar este» en ella: el pulso debe cambiar a la HR50 en unos segundos, sin reiniciar.
 3. **Si tienes dos bandas que la aplicación no conoce**: pulsa «Olvidar» en las dos y enciéndelas a la vez. El
    Panel debe decir «varias bandas cerca, elige cuál en Ajustes», y en Ajustes debes poder elegir la tuya.
+
+## 3. Probar las rutas GPX (sin rodillo, en el simulador)
+
+1. Consigue el GPX de una carrera o de un puerto, **con altitud**. Las webs de las carreras suelen tenerlo, o se
+   puede exportar de Strava, Komoot o RideWithGPS.
+2. `./start.sh` → **Ajustes → Modo: Simulador**.
+3. **Rutas → Subir GPX**. Revisa distancia, desnivel y pendiente máxima: ¿cuadran con lo que publica la carrera?
+   Pulsa **Ver perfil**.
+4. **Rodar esta ruta** → en el **Panel**, **Iniciar sesión**. Mira el perfil con tu posición, cómo cambia la
+   pendiente según avanzas y cómo baja la velocidad en las subidas.
+5. Comprueba que los botones de pendiente están bloqueados mientras ruedas la ruta, y que **Salir de la ruta**
+   no provoca saltos.
+
+Cuéntame si el desnivel calculado se parece al oficial de la carrera: es la mejor forma de validar el suavizado.

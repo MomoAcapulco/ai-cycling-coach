@@ -21,19 +21,23 @@ Safety (each rule has a test in tests/test_grade_controller.py):
 - On exit GearShifter.finish leaves 0.4 % and gear 12; this controller only marks itself stopped.
 - Every write goes through ``SafeZwiftWriter`` with ``incline_limits`` = the rider's [min, max].
 
-PENDING the supervised grade test (tools/zwift_grade_test.py, step 5): whether 0 % disables the gears
-(``ZERO_INCLINE_X100``) and whether the trainer confirms a grade. Until then a grade is NOT confirmed: the
-UI shows "sent", never "applied".
+Confirmation (measured in the supervised grade test, diagnostics/zwift_grade_test_20261113_123554.json):
+every grade written is followed by HubRequest 512, whose answer carries the grade the trainer APPLIED
+(zwift_hub.decode_hub_response → ``inclineX100``). The UI shows "applied" only when that answer matches; without
+an answer within ``confirm_timeout_s`` the grade is written again, up to ``max_retries``, then the status is
+UNCONFIRMED (the 10 s refresh keeps trying). An exact 0 % is sent as 0: the test showed it is applied and that
+gears keep working at 0 % on this trainer.
 """
 import math
 from dataclasses import dataclass
 from time import monotonic
 from typing import Optional
 
-from coach.devices.zwift_hub import Simulation, encode_hub_command
+from coach.devices.zwift_hub import (DATA_ID_SIMULATION, Simulation, decode_hub_response, encode_hub_command,
+                                     encode_hub_request)
 
 START_INCLINE_X100 = 40          # 0.4 %: what GearShifter.start/finish send
-ZERO_INCLINE_X100 = 1            # 0 % is sent as 0.01 % (Incyclist) until step 5 says 0 is safe for gears
+ZERO_INCLINE_X100 = 0            # 0 % is sent as 0: measured safe for gears (Incyclist sends 0.01 % instead)
 TARGET_RANGE = (-15.0, 20.0)     # what the rider may ask for, in %
 HARD_LIMITS_X100 = (-1000, 2000)  # never written whatever the profile says: -10 % .. +20 %
 
@@ -71,7 +75,8 @@ def validate_target(value) -> float:
 
 class GradeController:
     def __init__(self, prefs: GradePrefs = GradePrefs(), ride=None, clock=monotonic, min_cadence=40,
-                 max_rise_per_s=1.0, min_step_x100=10, min_interval_s=1.0, refresh_s=10.0):
+                 max_rise_per_s=1.0, min_step_x100=10, min_interval_s=1.0, refresh_s=10.0,
+                 confirm_timeout_s=1.5, max_retries=3):
         from coach.session.virtual_ride import VirtualRide
         self.prefs = prefs
         self.ride = ride if ride is not None else VirtualRide()
@@ -84,6 +89,10 @@ class GradeController:
         self.last_tick: Optional[float] = None
         self.status = 'STARTING'
         self.held = False
+        self.confirm_timeout_s, self.max_retries = confirm_timeout_s, max_retries
+        self.confirmed_x100: Optional[int] = None   # what the trainer said it applied (answer to 512)
+        self.retries = 0
+        self.unconfirmed = False
 
     # ---- rider ----
     def set_prefs(self, prefs: GradePrefs):
@@ -98,6 +107,17 @@ class GradeController:
             return None
         return round(self.prefs.effective(self.ride.road_grade), 2)
 
+    # ---- messages from the trainer ----
+    def on_message(self, raw: bytes):
+        response = decode_hub_response(raw)
+        if response and response.get('dataId') == DATA_ID_SIMULATION and 'inclineX100' in response:
+            self.confirmed_x100 = response['inclineX100']
+            if self.confirmed_x100 == self.sent_x100:
+                self.retries, self.unconfirmed = 0, False
+
+    def confirmed(self) -> bool:
+        return self.sent_x100 is not None and self.confirmed_x100 == self.sent_x100
+
     # ---- trainer worker ----
     def start(self):
         """After GearShifter.start (connect or reconnect): the trainer is at 0.4 %, rise from there."""
@@ -105,6 +125,7 @@ class GradeController:
         self.sent_x100 = START_INCLINE_X100
         self.sent_at = self.clock()
         self.last_tick = None
+        self.confirmed_x100, self.retries, self.unconfirmed = None, 0, False
         self.status = 'FLAT_START' if self.ride.target_grade is None else 'RAMPING'
 
     async def tick(self, writer, trainer: dict):
@@ -134,11 +155,22 @@ class GradeController:
                     or settled))  # a change below 0.1 % only once the road has reached the target
         if not due and since >= self.refresh_s:
             due = True  # periodic re-send of the same (or settled) value
+        if not due and not changed and not self.confirmed() and since >= self.confirm_timeout_s:
+            if self.retries < self.max_retries:
+                self.retries += 1  # the trainer did not confirm it: write the same grade again
+                due = True
+            else:
+                self.unconfirmed = True  # keep riding; the 10 s refresh keeps trying
+        if self.unconfirmed and self.status == 'SET':
+            self.status = 'UNCONFIRMED'   # movement states (HOLD_NOT_PEDALLING, RAMPING) say more
         if not due:
             return
         if self.sent_x100 is not None and x100 > self.sent_x100 and not self._pedalling(trainer):
             return  # belt and braces: a harder write is never made while not pedalling
+        if x100 != self.sent_x100:
+            self.retries, self.unconfirmed = 0, False
         await writer.write(encode_hub_command(simulation=Simulation(incline_x100=x100)))
+        await writer.write(encode_hub_request(DATA_ID_SIMULATION))   # ask what the trainer applied
         self.sent_x100, self.sent_at = x100, now
 
     def stopped(self):
@@ -164,6 +196,8 @@ class GradeController:
         return {'gradeControlMode': 'TRAINER',
                 'effectiveGradePercent': self.effective(),
                 'sentGradePercent': None if self.sent_x100 is None else self.sent_x100 / 100,
+                'appliedGradePercent': None if self.confirmed_x100 is None else self.confirmed_x100 / 100,
+                'gradeConfirmed': self.confirmed(),
                 'gradeStatus': self.status,
                 'gradeDifficultyPercent': self.prefs.difficulty_percent,
                 'gradeDescentFactorPercent': self.prefs.descent_factor_percent,

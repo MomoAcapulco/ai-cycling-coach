@@ -18,6 +18,8 @@ Abre `http://127.0.0.1:5173`. En el **Panel** inicias, pausas y terminas las ses
 
 La aplicación lleva una **carretera virtual**: la velocidad se calcula con física a partir de tus vatios y tu peso (la del rodillo no baja al subir), y con ella la distancia, la altitud y el desnivel acumulado. La pendiente la eliges tú y cambia según avanzas, como en una carretera. Puedes probarla sin rodillo en el simulador: `docs/pruebas/PRUEBA-pendiente-en-el-simulador.md`.
 
+En **Rutas** subes el GPX de una carrera o de un puerto y lo ruedas: la pendiente sigue su perfil según avanzas, y el Panel muestra el recorrido completo con tu posición.
+
 ## Tus datos
 
 En `~/dev/ai-cycling-coach-data/`, **junto a** las carpetas de versión: cada versión nueva los encuentra sin copiar nada, y se pueden compartir para analizarlos. Lo que hubiera en el antiguo `~/.ai-cycling-coach/` se copia allí al arrancar (sin sobrescribir ni borrar). Otra carpeta: `AI_COACH_HOME` en `.env`.
@@ -29,6 +31,7 @@ En `~/dev/ai-cycling-coach-data/`, **junto a** las carpetas de versión: cada ve
 | Dispositivos recordados | `ai-cycling-coach-data/devices.json` |
 | Ajustes guardados desde la web | `ai-cycling-coach-data/settings.json` |
 | Perfil del ciclista | `ai-cycling-coach-data/profile.json` |
+| Rutas GPX subidas | `ai-cycling-coach-data/routes/` (`ROUTES_DIR` para otra carpeta) |
 
 `.env` da los valores por defecto (copia de `.env.example` en la primera instalación). Lo guardado en Ajustes manda sobre `.env` hasta que pulses «Volver a .env».
 

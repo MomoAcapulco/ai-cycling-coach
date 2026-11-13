@@ -11,7 +11,7 @@ from coach.app.server import ReadingStore
 from coach.devices.gear_shifter import GearShifter, gear_for_ratio
 from coach.devices.wahoo import INDOOR_BIKE_DATA
 from coach.devices.zwift_controllers import ControllerState
-from coach.devices.zwift_hub import ASYNC, OP_HUB_REQUEST, SYNC_RX, SYNC_TX, decode_hub_command
+from coach.devices.zwift_hub import ASYNC, OP_HUB_REQUEST, SYNC_RX, SYNC_TX, decode_hub_command, encode_hub_request
 from tests.test_gear_shifter import confirmation
 
 FTMS_75_RPM = bytes([0x44, 0x00, 0xCB, 0x05, 0x96, 0x00, 0x7F, 0x00])  # 14.83 km/h, 75 rpm, 127 W
@@ -25,7 +25,7 @@ class FakeKickr:
         FakeKickr.last = self
         chars = [SimpleNamespace(uuid=u) for u in (INDOOR_BIKE_DATA, ASYNC, SYNC_RX, SYNC_TX)]
         self.services = [SimpleNamespace(characteristics=chars)]
-        self.callbacks, self.writes, self.is_connected, self.gear = {}, [], True, None
+        self.callbacks, self.writes, self.is_connected, self.gear, self.incline = {}, [], True, None, None
 
     async def __aenter__(self):
         self.task = asyncio.create_task(self.stream())
@@ -53,7 +53,13 @@ class FakeKickr:
         physical = (decode_hub_command(data) or {}).get('physical')
         if physical:
             self.gear = gear_for_ratio(physical['gearRatioX10000'])
-        if data[:1] == bytes([OP_HUB_REQUEST]) and self.gear and SYNC_TX in self.callbacks:
+        simulation = (decode_hub_command(data) or {}).get('simulation')
+        if simulation:
+            self.incline = simulation['inclineX100']
+        if data == encode_hub_request(512) and SYNC_TX in self.callbacks:
+            from tests.test_grade_controller import simulation_answer
+            self.callbacks[SYNC_TX](None, simulation_answer(self.incline))   # the applied grade
+        elif data[:1] == bytes([OP_HUB_REQUEST]) and self.gear and SYNC_TX in self.callbacks:
             self.callbacks[SYNC_TX](None, confirmation(self.gear))
 
     def gears(self):
@@ -117,12 +123,14 @@ class TrainerWorkerShiftingTests(unittest.TestCase):
             controllers.simulate_shift(+1)
             await asyncio.sleep(2.5)
             during = (grade.snapshot()['sentGradePercent'], controllers.snapshot()['trainerGear'])
+            confirmed = grade.snapshot()['gradeConfirmed']
             stop.set()
             await asyncio.wait_for(task, timeout=5)
-            return nothing_yet, during
+            return nothing_yet, during, confirmed
 
         with patch.dict(sys.modules, {'bleak': bleak}), patch('coach.devices.wahoo.find_for_role', found_trainer):
-            nothing_yet, during = asyncio.run(scenario())
+            nothing_yet, during, confirmed = asyncio.run(scenario())
+        self.assertTrue(confirmed)                       # the applied grade came back through the worker
         self.assertEqual(nothing_yet, 0.4)            # only GearShifter's start grade until the rider chooses
         self.assertEqual(during, (4.0, 13))
         writes = [d for _, d in FakeKickr.last.writes]

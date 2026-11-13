@@ -38,12 +38,16 @@ async def hr_worker(store, stop_event, device_id=None, capture=None, scan_lock=N
                     registry=None):
     from bleak import BleakClient
     delay = 2
+    last_problem = None
     while not stop_event.is_set():
         try:
             store.waiting('Buscando pulsómetro BLE...')
             found = await find_for_role('heart_rate', registry=registry, explicit_id=device_id, scan_lock=scan_lock)
             if found is None:
-                raise RuntimeError('No se encuentra el pulsómetro; activa la banda')
+                # Straps only advertise with skin contact, and stop while another device (watch, phone, Zwift)
+                # is connected to them: say what to check instead of just "waiting".
+                raise RuntimeError('no se ve la banda: póntela humedecida y comprueba que no esté conectada '
+                                   'a un reloj, al móvil o a Zwift')
             if isinstance(found, Ambiguous):
                 raise RuntimeError(found.message())
             device = found.device
@@ -74,7 +78,13 @@ async def hr_worker(store, stop_event, device_id=None, capture=None, scan_lock=N
                     await client.stop_notify(HEART_RATE_MEASUREMENT)
                 store.waiting('Pulsómetro desconectado; reconectando...')
         except Exception as exc:
-            store.waiting(f'HR BLE: {type(exc).__name__}: {exc}')
+            message = f'HR BLE: {type(exc).__name__}: {exc}'
+            if message != last_problem:
+                print(f'HEART RATE: {exc}', flush=True)   # once per new problem, in the start.sh terminal
+                last_problem = message
+            store.waiting(message)
+        else:
+            last_problem = None
         if not stop_event.is_set():
             await sleep_unless_stopped(stop_event, delay)
             delay = min(delay * 2, 15)

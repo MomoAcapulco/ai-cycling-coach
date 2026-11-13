@@ -5,7 +5,7 @@ import type { Sample, Telemetry } from '../types';
 
 const MODE_LABEL: Record<string, string> = { SIMULATOR: 'SIMULADOR', WAHOO: 'RODILLO REAL', REPLAY: 'REPLAY · HISTÓRICO' };
 
-export function Header({ version, data, route }: { version: string; data: Telemetry | null; route: 'panel' | 'sesiones' | 'ajustes' }) {
+export function Header({ version, data, route }: { version: string; data: Telemetry | null; route: 'panel' | 'rutas' | 'sesiones' | 'ajustes' }) {
   const mode = data?.mode ?? data?.source;
   return (
     <header>
@@ -15,6 +15,7 @@ export function Header({ version, data, route }: { version: string; data: Teleme
       </div>
       <nav className="nav">
         <a href="#/" className={route === 'panel' ? 'active' : ''}>Panel</a>
+        <a href="#/rutas" className={route === 'rutas' ? 'active' : ''}>Rutas</a>
         <a href="#/sesiones" className={route === 'sesiones' ? 'active' : ''}>Sesiones</a>
         <a href="#/ajustes" className={route === 'ajustes' ? 'active' : ''}>Ajustes</a>
         <span className={`mode ${mode === 'REPLAY' ? 'replay' : ''}`}>{mode ? MODE_LABEL[mode] ?? mode : 'CONECTANDO'}</span>
@@ -29,11 +30,17 @@ const battery = (pct: number | null | undefined) => (pct == null ? '' : ` · ${p
 const mustChoose = (text?: string | null) => !!text && (text.includes('elige uno en Ajustes') || text === 'CHOOSE_IN_SETTINGS');
 const CHOOSE = <a href="#/ajustes">elige cuál en Ajustes</a>;
 
+/** Why a device is not streaming, in a few words: the adapter's message without the technical prefix. */
+const reason = (text?: string | null) =>
+  text ? text.replace(/^(HR BLE|BLE): [A-Za-z]+Error: /, '').replace(/^(HR BLE|BLE): /, '') : '';
+
 export function StatusBar({ data }: { data: Telemetry | null }) {
   return (
     <div className="statuses">
       <span className={data?.connected ? 'ok' : 'off'}>● Telemetría: {mustChoose(data?.error) ? <>varios rodillos cerca, {CHOOSE}</> : data?.status ?? 'Esperando'}</span>
-      <span className={data?.heartRateConnected ? 'ok' : 'off'}>● Pulso: {mustChoose(data?.heartRateError) ? <>varias bandas cerca, {CHOOSE}</> : data?.heartRateStatus ?? 'Esperando'}</span>
+      <span className={data?.heartRateConnected ? 'ok' : 'off'}>● Pulso: {mustChoose(data?.heartRateError) ? <>varias bandas cerca, {CHOOSE}</>
+        : data?.heartRateConnected || data?.heartRateStatus === 'DISABLED' ? data?.heartRateStatus
+          : <>{data?.heartRateStatus ?? 'Esperando'}{reason(data?.heartRateError) && ` · ${reason(data?.heartRateError)}`}</>}</span>
       <span className={data?.zwiftLeftConnected ? 'ok' : 'off'}>
         ● Mando izq.: {mustChoose(data?.zwiftLeftStatus) ? CHOOSE : data?.zwiftLeftStatus ?? 'Sin datos'}{battery(data?.zwiftLeftBatteryPercent)}
       </span>
@@ -53,7 +60,7 @@ export function Metrics({ data, power3s }: { data: Telemetry | null; power3s: nu
   const gradeNote = !hasRoad
     ? (grade == null ? 'Sin orden en esta fase' : 'Pendiente ordenada (registro antiguo)')
     : target == null ? 'Llano: elige una pendiente en el panel'
-      : `Pedida ${fmt(target, 1)} %${onTrainer ? ` · rodillo ${fmt(data?.effectiveGradePercent, 1)} %` : ''}`;
+      : `Pedida ${fmt(target, 1)} %${onTrainer ? ` · rodillo ${fmt(data?.gradeConfirmed ? data?.appliedGradePercent : data?.effectiveGradePercent, 1)} %${data?.gradeConfirmed ? ' ✓' : ''}` : ''}`;
   const speed = data?.rideSpeedKph ?? data?.speedKph;
   const gain = data?.sessionElevationGainM ?? data?.elevationGainM;
   return (

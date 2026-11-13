@@ -64,6 +64,25 @@ Historial de versiones (lo que antes estaba en un README por versión). La más 
   - Ajustes → Dispositivos: por cada tipo, la lista con «Usar este» y «Olvidar». El pulsómetro y los mandos cambian al momento; el rodillo, en la siguiente conexión. Si hay un ID fijado en `.env`, se muestra.
   - **Sin filtros de nombre**: los dispositivos se encuentran solo por su tipo, de cualquier marca. `WAHOO_DEVICE_NAME` y `HR_DEVICE_NAME` se ignoran, con un aviso al arrancar (antes, `HR_DEVICE_NAME=HR50` impedía usar una banda de otra marca).
   - API: `GET /devices` (con `known`, `pending` y `envFilters`), `POST /devices/<tipo>/use`, `DELETE /devices/<tipo>?address=…`.
+- **Paso 5 hecho** (`diagnostics/zwift_grade_test_20261113_123554.json`). Los cambios se notaron naturales, sin exagerar.
+  - **El rodillo confirma la pendiente**: la respuesta a la petición 512 trae, en su campo 6, la pendiente aplicada. Coincidió 7 de 7 veces y llega en ~0,3 s.
+  - **El 0 % exacto funciona**: el rodillo lo aplica, y las marchas siguen confirmándose y notándose con 0 %.
+  - **Mandar una marcha no borra la pendiente.**
+  - **La velocidad del rodillo** en modo Zwift es una velocidad física con inercia, pero para la pendiente que aplica el rodillo (tras la dificultad). A igual potencia y pendiente, nuestra carretera virtual da ±1 km/h de lo que da él, y CdA 0,40 es el que mejor encaja. Corregida la explicación anterior, que la describía como una simple cuenta de cadencia por marcha.
+- **Pendiente confirmada** (`grade_controller.py`): tras cada envío se pide la 512. El Panel muestra «Aplicada ✓» solo si el rodillo lo confirma; si no contesta, se reintenta 3 veces y luego aparece «sin confirmar», y el reenvío cada 10 s sigue intentándolo. El 0 % se manda como 0 (antes, 0,01 %).
+- **Correcciones tras la prueba en la aplicación del 13-11**:
+  - El reloj grande del Panel mostraba el tiempo desde que arrancó el adaptador. Ahora es el **tiempo de la sesión**: empieza al pulsar «Iniciar sesión», sigue corriendo aunque dejes de pedalear y descuenta las pausas. Sin sesión muestra «--:--».
+  - Al iniciar una sesión nueva, las gráficas, el perfil del recorrido y la pendiente máxima **empiezan de cero**, con el tiempo de la sesión. Antes arrastraban todo lo anterior. Al terminar, la última sesión se queda en pantalla hasta empezar otra.
+  - Botones ±0,5 % de la pendiente: varias pulsaciones seguidas solo contaban una por segundo, porque cada pulsación sumaba a la última lectura de telemetría y el botón se bloqueaba mientras se enviaba. Ahora cada pulsación suma al instante y se envía una sola vez, 0,3 s después de la última, con el total. El deslizador no tenía el problema.
+  - Pulsómetro: si no se ve la banda, el Panel ya dice qué comprobar (que esté puesta y humedecida, y que no esté conectada a un reloj, al móvil o a Zwift) y la terminal lo escribe una vez. Antes solo ponía «WAITING».
+- **Rutas GPX** (`coach/session/route.py`, `coach/app/routes_store.py`, página **Rutas**):
+  - Subir GPX (1.0 o 1.1, con track o ruta, y con altitud; máximo 10 MB), guardarlos en `ai-cycling-coach-data/routes/` (fuera del repositorio) sin sobrescribir nunca, ver su perfil y elegir cuál rodar. Funciona en el simulador y en el rodillo real con el control de marchas.
+  - Perfil cada 10 m. La altitud de los GPX es ruidosa y se suaviza con una media de 100 m: con ±1,5 m de ruido, un llano quedaba con picos del 5,5 % usando 50 m y queda por debajo del 3 % con 100 m. Los extremos se tratan por reflexión, para no aplanar una ruta que empieza o termina subiendo. Las pendientes imposibles se recortan a −15 … +20 % y se avisa.
+  - Mientras ruedas una ruta, la pendiente pedida es la del perfil en la distancia recorrida desde que empezó, con la transición de siempre (1 % cada 20 m). Al final pasa a llano. La pendiente manual queda bloqueada hasta salir de la ruta, y al salir se mantiene la pendiente del momento, sin saltos.
+  - Panel: perfil completo de la ruta con tu posición y los kilómetros que quedan. El CSV de sesión guarda `routeName` y `routeProgressKm`.
+  - API: `GET/POST /routes`, `GET /routes/<fichero>` (perfil), `GET /route`, `POST /route/start` y `POST /route/stop`; reenvío en la API Java.
+  - Corregido en las pruebas: un último tramo de pocos centímetros generaba una pendiente absurda al final de la ruta.
+  - Rutas sin el rodillo: `docs/PENDIENTES-sin-rodillo.md`.
 - **Proyecto open source (MIT)**:
   - `LICENSE` (MIT) y `THIRD_PARTY_NOTICES.md`: el código del protocolo Zwift portado de Serpentine (MIT) con su aviso, y créditos de Incyclist, jat255 y de los proyectos consultados solo como referencia (BikeControl, qdomyos, SHIFTR, zwiftplay).
   - `scripts/mask_personal_data.py`: cambia los identificadores Bluetooth reales, números de serie y nombres de dispositivos cercanos por valores falsos fijos, y los pesos de las guías por pesos de ejemplo. Aplicado a fixtures, tests y guías; los tests usan ahora 80 + 9,5 kg.

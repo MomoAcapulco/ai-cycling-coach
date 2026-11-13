@@ -26,6 +26,11 @@ def recordings_dir() -> Path:
     return Path(os.environ.get('RECORD_DIR') or data_home() / 'recordings').expanduser()
 
 
+def routes_dir() -> Path:
+    """Uploaded GPX routes (coach/session/route.py). In the data home: a GPX may be a ride of the rider's own."""
+    return Path(os.environ.get('ROUTES_DIR') or data_home() / 'routes').expanduser()
+
+
 def diagnostics_dir() -> Path:
     """Output of the read-only diagnostic tools (scans, trainer inventory): inside the project folder,
     so it can be shared for analysis. Ride recordings stay in recordings_dir()."""

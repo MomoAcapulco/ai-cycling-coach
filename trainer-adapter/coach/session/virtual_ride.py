@@ -1,8 +1,12 @@
 """The virtual road the rider is on: speed from power (physics), distance, altitude and elevation gain.
 
-Why compute the speed: in Zwift mode the trainer's speed is kinematic, cadence × gear ratio × ~2.1 m (measured
-in the gear test), so it does NOT drop on a climb: 70 rpm in gear 12 reads ~21 km/h at 0 % and at 8 %. Distance
-and elevation built on it would be inflated on every climb. Zwift computes speed from power the same way.
+Why compute the speed: in Zwift mode the trainer reports its own virtual speed, physics with inertia, but for
+the grade the trainer APPLIES, which is the road grade after the difficulty (50 % by default): on an 8 % climb
+it rides a 4 % one, and its speed would be too high for the real climb. Without native control (free mode) its
+speed is just the flywheel's. Zwift likewise takes the speed from the power and the real grade (as documented
+publicly; its code is closed).
+Validated in the grade test (diagnostics/zwift_grade_test_20261113_123554.json): at the same power and grade the
+speeds below are within ~1 km/h of the trainer's own in steady riding, and CdA 0.40 fits best of 0.25-0.40.
 
 Model (forces along the road, SI units):
   drive   P / max(v, 1 m/s)                        (the floor keeps the start-up force finite)
@@ -18,6 +22,10 @@ Grade, like a real road: the rider chooses a TARGET grade; the ROAD grade moves 
 ``meters_per_percent`` metres travelled (20 m by default: 0 → 5 % takes ~100 m). Stopped, it does not change.
 The elevation uses the road grade (the real climb), not the grade the trainer applies after the difficulty —
 as Zwift does: with 50 % difficulty you feel half the climb, but you have climbed all of it.
+
+Routes (coach/session/route.py): choosing a GPX route is choosing the grade. While it is active the TARGET is the
+route's grade at the distance ridden since it started (the transition by distance still applies), manual grade
+requests are refused, and at its end the target becomes flat. Leaving it keeps the current road grade as target.
 """
 import math
 from threading import Lock
@@ -44,14 +52,36 @@ class VirtualRide:
         self.altitude_m = 0.0
         self.gain_m = 0.0
         self.vertical_ms = 0.0
+        self.route = None
+        self.route_start_m = 0.0
+        self.route_finished = False
 
     # ---- rider ----
     def request(self, grade_percent) -> float:
         from coach.devices.grade_controller import validate_target
         value = validate_target(grade_percent)
         with self.lock:
+            if self.route is not None and not self.route_finished:
+                raise PermissionError('A route is being ridden: leave it to choose the grade by hand')
+            self.route = None if self.route_finished else self.route
             self.target_grade = value
         return value
+
+    def start_route(self, route):
+        """Ride ``route`` (coach/session/route.Route) from here: its distance 0 is the current position."""
+        with self.lock:
+            self.route, self.route_start_m, self.route_finished = route, self.distance_m, False
+            self.target_grade = route.grade_at(0)
+
+    def stop_route(self):
+        with self.lock:
+            if self.route is not None:
+                self.route = None
+                self.route_finished = False
+                self.target_grade = round(self.road_grade, 1)   # no change felt when leaving the route
+
+    def route_progress_m(self) -> float:
+        return 0.0 if self.route is None else min(self.distance_m - self.route_start_m, self.route.distance_m)
 
     def set_profile(self, rider_kg: float, bike_kg: float, meters_per_percent: float):
         with self.lock:
@@ -73,6 +103,12 @@ class VirtualRide:
                 dt -= h
 
     def _substep(self, h, power):
+        if self.route is not None and not self.route_finished:
+            grade = self.route.grade_at(self.distance_m - self.route_start_m)
+            if grade is None:
+                self.route_finished, self.target_grade = True, 0.0   # end of the route: flat
+            else:
+                self.target_grade = grade
         theta = math.atan(self.road_grade / 100)
         mass = self.mass_kg
         drive = power / max(self.speed_ms, SPEED_FLOOR_MS) if power > 0 else 0.0
@@ -120,7 +156,7 @@ class VirtualRide:
     def snapshot(self, power_w: Optional[float] = None) -> dict:
         with self.lock:
             return {
-                'targetGradePercent': self.target_grade,
+                'targetGradePercent': None if self.target_grade is None else round(self.target_grade, 2),
                 'roadGradePercent': round(self.road_grade, 2),
                 'rideSpeedKph': round(self.speed_ms * 3.6, 2),
                 'rideDistanceKm': round(self.distance_m / 1000, 4),
@@ -129,4 +165,9 @@ class VirtualRide:
                 'vamMh': round(max(0.0, self.vertical_ms) * 3600),
                 'wattsPerKg': round(power_w / self.rider_kg, 2) if power_w and self.rider_kg else None,
                 'gradeTransitionMetersPerPercent': self.meters_per_percent,
+                'routeFile': self.route.file if self.route else None,
+                'routeName': self.route.name if self.route else None,
+                'routeDistanceKm': round(self.route.distance_m / 1000, 3) if self.route else None,
+                'routeProgressKm': round(self.route_progress_m() / 1000, 3) if self.route else None,
+                'routeFinished': self.route_finished if self.route else None,
             }

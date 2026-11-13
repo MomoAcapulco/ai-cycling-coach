@@ -7,19 +7,36 @@ from coach.devices.gear_shifter import SafeZwiftWriter, check_outgoing
 from coach.devices.grade_controller import (GradeController, GradePrefs, START_INCLINE_X100, ZERO_INCLINE_X100,
                                             validate_target)
 from coach.session.virtual_ride import VirtualRide
-from coach.devices.zwift_hub import SYNC_RX, Simulation, decode_hub_command, encode_hub_command
+from coach.devices.zwift_hub import SYNC_RX, Simulation, decode_hub_command, encode_hub_command, encode_hub_request
 
 LIVE = {'connected': True, 'cadenceRpm': 80}
 STOPPED = {'connected': True, 'cadenceRpm': 10}
 STALE = {'connected': False, 'cadenceRpm': 0}
 
 
+def simulation_answer(incline_x100, gear_ratio=24000):
+    """The trainer's 0x3C answer to HubRequest 512 (layout measured in the grade test, values synthetic)."""
+    from coach.devices.zwift_hub import encode_varint, zigzag
+    inner = bytes([0x30]) + encode_varint(zigzag(incline_x100)) + bytes([0x40]) + encode_varint(gear_ratio)
+    level1 = bytes([0x0A, len(inner)]) + inner
+    return bytes([0x3C, 0x08]) + encode_varint(512) + bytes([0x12, len(level1)]) + level1
+
+
 class FakeClient:
+    """Records writes; with ``answer`` set it answers HubRequest 512 like our KICKR (the last grade written)."""
     def __init__(self):
         self.writes = []
+        self.answer = None
+        self.incline = None
 
     async def write_gatt_char(self, uuid, data, response):
-        self.writes.append(bytes(data))
+        data = bytes(data)
+        self.writes.append(data)
+        simulation = (decode_hub_command(data) or {}).get('simulation')
+        if simulation:
+            self.incline = simulation['inclineX100']
+        if data == encode_hub_request(512) and self.answer and self.incline is not None:
+            self.answer(simulation_answer(self.incline))
 
 
 class Clock:
@@ -43,6 +60,7 @@ class GradeControllerTests(unittest.TestCase):
         self.ride = VirtualRide(80, 9.5)
         self.grade = GradeController(GradePrefs(), ride=self.ride, clock=self.clock)
         self.writer = SafeZwiftWriter(self.client, incline_limits=self.grade.limits_x100)
+        self.client.answer = self.grade.on_message      # the trainer confirms, as measured
         self.grade.start()
 
     def road(self, grade, target=None):
@@ -146,13 +164,45 @@ class GradeControllerTests(unittest.TestCase):
         self.run_for(10, STOPPED)
         self.assertEqual(inclines(self.client.writes)[-1], -50)     # -2 × 0.5 × 0.5
 
-    def test_exact_zero_is_sent_as_one_hundredth(self):
+    def test_exact_zero_is_sent_as_zero(self):
         self.road(4)
         self.run_for(30)
         self.road(0)
         self.run_for(10)
-        self.assertEqual(inclines(self.client.writes)[-1], ZERO_INCLINE_X100)
-        self.assertEqual(self.grade.snapshot()['sentGradePercent'], 0.01)
+        self.assertEqual(ZERO_INCLINE_X100, 0)            # measured: 0 % is applied and gears still work
+        self.assertEqual(inclines(self.client.writes)[-1], 0)
+        snap = self.grade.snapshot()
+        self.assertEqual((snap['sentGradePercent'], snap['appliedGradePercent'], snap['gradeConfirmed']), (0.0, 0.0, True))
+
+    def test_every_grade_is_followed_by_a_confirmation_request(self):
+        self.road(4)
+        self.run_for(30)
+        sims = [i for i, w in enumerate(self.client.writes) if 'simulation' in (decode_hub_command(w) or {})]
+        self.assertTrue(sims)
+        for i in sims:
+            self.assertEqual(self.client.writes[i + 1], encode_hub_request(512))
+        snap = self.grade.snapshot()
+        self.assertEqual((snap['appliedGradePercent'], snap['gradeConfirmed'], snap['gradeStatus']), (2.0, True, 'SET'))
+
+    def test_a_silent_trainer_gets_retries_then_unconfirmed(self):
+        self.client.answer = None                         # the trainer never answers 512
+        self.road(4)
+        self.run_for(30)
+        snap = self.grade.snapshot()
+        self.assertEqual((snap['gradeConfirmed'], snap['gradeStatus']), (False, 'UNCONFIRMED'))
+        settled = [w for w in self.client.writes if (decode_hub_command(w) or {}).get('simulation', {}).get('inclineX100') == 200]
+        self.assertGreaterEqual(len(settled), 1 + 3)      # first write + 3 retries
+        self.client.answer = self.grade.on_message        # it answers again: confirmed at the next refresh
+        self.run_for(11)
+        self.assertTrue(self.grade.snapshot()['gradeConfirmed'])
+        self.assertEqual(self.grade.snapshot()['gradeStatus'], 'SET')
+
+    def test_a_wrong_answer_is_not_a_confirmation(self):
+        self.road(4)
+        self.run_for(30)
+        self.grade.on_message(simulation_answer(150))     # the trainer says 1.5 % while we sent 2 %
+        self.assertFalse(self.grade.snapshot()['gradeConfirmed'])
+        self.assertEqual(self.grade.snapshot()['appliedGradePercent'], 1.5)
 
     def test_reconnect_rises_again_from_the_start_grade(self):
         self.road(16)                                # 8 %

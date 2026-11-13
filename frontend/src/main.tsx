@@ -6,6 +6,7 @@ import { Header } from './components/Panels';
 import { Dashboard } from './pages/Dashboard';
 import { Admin } from './pages/Admin';
 import { Sessions } from './pages/Sessions';
+import { Routes } from './pages/Routes';
 
 
 function App() {
@@ -14,7 +15,8 @@ function App() {
   return (
     <main>
       <Header version={__APP_VERSION__} data={data} route={route} />
-      {route === 'ajustes' ? <Admin /> : route === 'sesiones' ? <Sessions /> : <Dashboard data={data} error={error} history={history} />}
+      {route === 'ajustes' ? <Admin /> : route === 'sesiones' ? <Sessions /> : route === 'rutas' ? <Routes data={data} />
+        : <Dashboard data={data} error={error} history={history} />}
     </main>
   );
 }

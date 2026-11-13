@@ -23,7 +23,10 @@ cd ~/dev/ai-cycling-coach-v4.3.0/frontend && npm run build
 
 Cierra Zwift, Zwift Companion y la app de Wahoo.
 
-## 1. Paso 5: rampa suave de pendiente (unos 3 min)
+## 1. Paso 5: rampa suave de pendiente (unos 3 min) — ✅ HECHO el 13-11
+
+Resultado: el rodillo confirma la pendiente (respuesta 512), el 0 % exacto funciona y la aplicación ya está
+ajustada. Puedes hacer la prueba 3.
 
 Usa la herramienta, no la aplicación: con la aplicación arrancada no funciona.
 
@@ -51,7 +54,10 @@ Los pesos se toman de tu perfil guardado (Ajustes → Perfil). Si aún no lo has
 Este mismo fichero responde además a otra pregunta: si la velocidad del rodillo cambia con la pendiente a la misma
 cadencia. Esperamos que no.
 
-## 2. Aplicación: sesión con marchas y carretera virtual en llano (unos 10 min)
+## 2. Aplicación: sesión con marchas y carretera virtual en llano (unos 10 min) — ✅ HECHA el 13-11
+
+Todo bien salvo tres cosas, ya corregidas y por comprobar en la prueba 5: el reloj de sesión, que las gráficas
+no empezaban de cero y que el pulsómetro no conectó.
 
 Esta prueba no depende del paso 5.
 
@@ -76,9 +82,12 @@ guardado (tu peso y el de la bici).
 - [ ] Al salir con Ctrl+C, el rodillo vuelve a la marcha 12
 - [ ] Anotado si la velocidad de la carretera te pareció creíble
 
-## 3. Paso 6: pendiente en la aplicación (unos 15 min)
+## 3. Paso 6: pendiente en la aplicación (unos 15 min) — ✅ HECHA el 13-11
 
-Solo después de que haya ajustado la aplicación con el resultado del paso 1.
+«Todo bien con la pendiente». Los botones ±0,5 % solo contaban una pulsación por segundo: ya corregido, por
+comprobar en la prueba 5. Falta probar una ruta GPX con el rodillo (abajo, en la 5).
+
+Ya ajustada con el resultado del paso 1: puedes hacerla. Ahora el panel muestra «Aplicada ✓» cuando el rodillo confirma la pendiente.
 
 Mismos ajustes que en la prueba 2. Inicia una sesión y prueba, de menos a más:
 
@@ -96,8 +105,13 @@ Mismos ajustes que en la prueba 2. Inicia una sesión y prueba, de menos a más:
 - [ ] El panel muestra la pendiente de la carretera, la del rodillo y la enviada
 - [ ] El desnivel de la sesión cuadra con el perfil
 - [ ] Anotado si 20 m por cada 1 % te parece realista, o cuánto pondrías
+- [ ] **Una ruta GPX corta** (página Rutas → «Rodar esta ruta»): las subidas y bajadas de la ruta se notan
+  progresivas, y «Salir de la ruta» no da tirones
 
-## 4. Opcional: calibrar el modelo de velocidad con Zwift (unos 10 min)
+## 4. Opcional: calibrar el modelo de velocidad con Zwift (unos 10 min) — ya no hace falta
+
+Los datos del paso 5 ya lo han validado: a igual potencia y pendiente, nuestra velocidad se queda a ±1 km/h de la
+del propio rodillo.
 
 Sirve para afinar los coeficientes de la carretera virtual (CdA 0,40 y Crr 0,004).
 
@@ -105,6 +119,20 @@ En Zwift, sube un tramo de pendiente constante a potencia fija (por ejemplo 200 
 velocidad que marca. Repite lo mismo en llano.
 
 - [ ] Velocidades de Zwift anotadas (pendiente, vatios, km/h)
+
+## 5. Re-comprobar lo corregido el 13-11 (unos 10 min)
+
+Reinicia `./start.sh` para cargar los cambios.
+
+- [ ] **Reloj de sesión**: marca `--:--` hasta «Iniciar sesión», sigue corriendo si dejas de pedalear y se para
+  con «Pausar»
+- [ ] **Sesión nueva**: al «Terminar» e «Iniciar» otra, las gráficas, el perfil y la pendiente máxima empiezan de cero
+- [ ] **Botones ±0,5 %**: cinco pulsaciones seguidas suben la pendiente pedida 2,5 % de golpe
+- [ ] **Pulsómetro**: con la banda puesta, humedecida y sin conectar a otro aparato, conecta. Si no, apunta el
+  motivo que muestra el Panel
+- [ ] **Una ruta GPX corta** con el rodillo (Rutas → «Rodar esta ruta»): las subidas se notan progresivas y
+  «Salir de la ruta» no da tirones
+- [ ] (Tuyo) **Marcha 24 en Zwift**: ¿se parece a lo que notas aquí?
 
 ## Qué me pasas al final
 

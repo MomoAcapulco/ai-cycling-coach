@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
 import { average, clock } from '../format';
-import type { Sample, Session, Telemetry } from '../types';
-import { ElevationProfile, GradeProfile, TraceChart } from '../components/Charts';
+import type { ActiveRoute, Sample, Session, Telemetry } from '../types';
+import { ElevationProfile, GradeProfile, RouteProfile, TraceChart } from '../components/Charts';
 import { GradePanel } from '../components/GradePanel';
 import { GearPanel, Metrics, ReplayPlayer, SessionStats, StatusBar } from '../components/Panels';
 import { SessionBar } from '../components/SessionBar';
@@ -18,6 +18,16 @@ export function Dashboard({ data, error, history }: { data: Telemetry | null; er
   const [session, setSession] = useState<Session | null>(null);
   const [actionError, setActionError] = useState('');
   const [fullView, setFullView] = useState(false);
+  const [route, setRoute] = useState<ActiveRoute | null>(null);
+  const routeFile = data?.routeFile ?? null;
+
+  // The profile of the route being ridden is loaded once per route; the position comes with the telemetry.
+  useEffect(() => {
+    if (!routeFile) { setRoute(null); return; }
+    let alive = true;
+    api.route().then((r) => { if (alive) setRoute(r); }).catch(() => undefined);
+    return () => { alive = false; };
+  }, [routeFile]);
   const replayKey = replay ? `${data?.replayFile}:${data?.replayDurationSeconds}` : '';
 
   // The full recorded session is loaded once per replay file.
@@ -31,7 +41,17 @@ export function Dashboard({ data, error, history }: { data: Telemetry | null; er
   }, [replay, replayKey]);
 
   const points = replay ? session?.samples ?? [] : history;
-  const seconds = data?.elapsedSeconds ?? 0;
+  // The big timer is the SESSION time: from «Iniciar sesión», running while you stop pedalling, without the
+  // time spent in «Pausar». Before a session starts there is nothing to time. The live charts use the same clock
+  // during a session (hooks.useTelemetry), the adapter time otherwise, and the replay position in REPLAY.
+  const sessionState = data?.sessionState ?? 'UNAVAILABLE';
+  const inSession = sessionState === 'RUNNING' || sessionState === 'PAUSED';
+  const lastPoint = history[history.length - 1]?.t ?? 0;
+  const seconds = replay ? data?.elapsedSeconds ?? 0
+    : inSession ? Math.round(data?.sessionElapsedSeconds ?? 0)
+      : sessionState === 'IDLE' && history.length && lastPoint < (data?.elapsedSeconds ?? 0) - 5 ? lastPoint  // finished session on screen
+        : data?.elapsedSeconds ?? 0;
+  const timerSeconds = replay ? seconds : inSession ? data?.sessionElapsedSeconds ?? 0 : null;
   const duration = replay
     ? session?.durationSeconds ?? data?.replayDurationSeconds ?? 1
     : Math.max(600, points[points.length - 1]?.t ?? 0);
@@ -52,14 +72,26 @@ export function Dashboard({ data, error, history }: { data: Telemetry | null; er
           <h1>Tu sesión, en detalle</h1>
           <p className="muted">{SUBTITLE[mode] ?? 'Conectando con el adaptador…'}</p>
         </div>
-        <div className="timer"><small>TIEMPO DE SESIÓN</small><strong>{clock(seconds)}</strong>{replay && <small>de {clock(duration)}</small>}</div>
+        <div className="timer">
+          <small>{replay ? 'POSICIÓN DEL REPLAY' : 'TIEMPO DE SESIÓN'}</small>
+          <strong>{timerSeconds == null ? '--:--' : clock(timerSeconds)}</strong>
+          {replay && <small>de {clock(duration)}</small>}
+          {!replay && sessionState === 'PAUSED' && <small>EN PAUSA</small>}
+          {!replay && !inSession && <small>Pulsa «Iniciar sesión»</small>}
+        </div>
       </div>
       {shownError && <div className="alert">{shownError}</div>}
       <StatusBar data={data} />
       {!replay && <SessionBar data={data} onError={setActionError} />}
       <Metrics data={data} power3s={power3s} />
       {replay && <ReplayPlayer data={data} duration={duration} firstCommandAt={firstCommandAt} onError={setActionError} />}
-      {points.some((p) => p.distance != null) && (
+      {route?.active && (
+        <section className="panel">
+          <RouteProfile profile={route.profile} progressKm={data?.routeProgressKm ?? route.progressKm}
+            title={`Ruta: ${route.name}${data?.routeFinished ? ' · TERMINADA' : ''}`} />
+        </section>
+      )}
+      {!route?.active && points.some((p) => p.distance != null) && (
         <section className="panel"><ElevationProfile points={points} current={seconds} fullView={replay && fullView} /></section>
       )}
       <section className="panel"><GradeProfile points={points} current={seconds} duration={duration} kind={session?.gradeKind} /></section>

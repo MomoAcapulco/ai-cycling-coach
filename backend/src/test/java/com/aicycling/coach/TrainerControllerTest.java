@@ -200,6 +200,22 @@ class TrainerControllerTest {
     }
 
     @Test
+    void gpxRoutesAreForwarded() throws Exception {
+        REPLIES.put("/routes", new Reply(201, "{\"file\":\"climb.gpx\"}"));
+        mvc.perform(post("/api/trainer/routes?name=climb.gpx").contentType("application/gpx+xml").content("<gpx/>"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.file").value("climb.gpx"));
+        assertThat(LAST_REQUEST.get("query")).isEqualTo("name=climb.gpx");
+        assertThat(LAST_REQUEST.get("contentType")).isEqualTo("application/gpx+xml");
+        assertThat(LAST_REQUEST.get("body")).isEqualTo("<gpx/>");
+        REPLIES.put("/route/start", new Reply(409, "Grade control needs the simulator"));
+        mvc.perform(post("/api/trainer/route/start").contentType(MediaType.APPLICATION_JSON).content("{\"file\":\"climb.gpx\"}"))
+                .andExpect(status().isConflict());
+        REPLIES.put("/route", new Reply(200, "{\"active\":false}"));
+        mvc.perform(get("/api/trainer/route")).andExpect(status().isOk()).andExpect(jsonPath("$.active").value(false));
+    }
+
+    @Test
     void sessionActionsAndListAreForwarded() throws Exception {
         REPLIES.put("/session/start", new Reply(200, "{\"sessionState\":\"RUNNING\"}"));
         mvc.perform(post("/api/trainer/session/start"))

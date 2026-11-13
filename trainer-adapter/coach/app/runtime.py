@@ -17,7 +17,7 @@ from coach.session.diagnostics import RawCapture
 from coach.devices.hr50 import hr_worker
 from coach.app.rider_profile import ProfileStore
 from coach.session.recording import CsvReplay, record_once
-from coach.app.paths import recordings_dir
+from coach.app.paths import recordings_dir, routes_dir
 from coach.app.settings import Settings, SettingsStore
 from coach.devices.wahoo import bluetooth_worker
 from coach.devices.zwift_controllers import controller_worker
@@ -55,6 +55,7 @@ class EnvConfig:
     hr_device_id: Optional[str] = None
     zwift_left_id: Optional[str] = None
     zwift_right_id: Optional[str] = None
+    routes_dir: Path = field(default_factory=routes_dir)
 
     @classmethod
     def from_env(cls, env=None):

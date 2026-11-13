@@ -85,3 +85,4 @@ a.button-link:hover{background:#2b4f46}
 .swatch{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px;opacity:.8}
 .metrics{grid-template-columns:repeat(3,minmax(0,1fr))}.grade-figures.three{grid-template-columns:1fr 1fr 1fr}@media(max-width:900px){.metrics{grid-template-columns:repeat(2,1fr)}}
 .device-role{margin-top:8px}.device-actions{display:flex;gap:6px;justify-content:end}
+.route-mini svg{display:block;width:100%;height:90px;margin:6px 0}
