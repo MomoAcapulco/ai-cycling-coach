@@ -155,7 +155,10 @@ export type RiderProfile = {
   maxGradePercent: number;
   minGradePercent: number;
   gradeTransitionMetersPerPercent: number;
+  bikeType: BikeType;
 };
+
+export type BikeType = 'ROAD' | 'MTB';
 
 export type ProfileState = { profile: RiderProfile; saved: boolean; profileFile: string };
 

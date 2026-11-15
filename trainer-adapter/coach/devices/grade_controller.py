@@ -48,11 +48,14 @@ class GradePrefs:
     descent_factor_percent: int = 50
     max_grade_percent: float = 10.0
     min_grade_percent: float = -5.0
+    crr_x100000: int = 400             # rolling resistance sent with every grade: the bike type's (road 0.004)
 
     @classmethod
     def from_profile(cls, profile):
+        from coach.session.virtual_ride import BIKE_PHYSICS
         return cls(profile.grade_difficulty_percent, profile.grade_descent_factor_percent,
-                   profile.max_grade_percent, profile.min_grade_percent)
+                   profile.max_grade_percent, profile.min_grade_percent,
+                   round(BIKE_PHYSICS[profile.bike_type][1] * 100000))
 
     def limits_x100(self):
         return round(self.min_grade_percent * 100), round(self.max_grade_percent * 100)
@@ -169,7 +172,7 @@ class GradeController:
             return  # belt and braces: a harder write is never made while not pedalling
         if x100 != self.sent_x100:
             self.retries, self.unconfirmed = 0, False
-        await writer.write(encode_hub_command(simulation=Simulation(incline_x100=x100)))
+        await writer.write(encode_hub_command(simulation=Simulation(incline_x100=x100, crr_x100000=self.prefs.crr_x100000)))
         await writer.write(encode_hub_request(DATA_ID_SIMULATION))   # ask what the trainer applied
         self.sent_x100, self.sent_at = x100, now
 

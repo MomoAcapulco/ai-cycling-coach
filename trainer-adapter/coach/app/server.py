@@ -309,17 +309,27 @@ class Handler(BaseHTTPRequestHandler):
     def send_session_file(self, name):
         """Download of a finished session's file: only session_* names inside the recordings folder."""
         import re
-        if not re.fullmatch(r'session_\d{8}_\d{6}(_ble_raw\.jsonl|\.csv|\.json)', name):
+        if re.fullmatch(r'session_\d{8}_\d{6}\.fit', name):
+            # the FIT activity is built on request from the session's CSV and summary (coach/session/fit_export.py)
+            from coach.session.fit_export import session_fit
+            try:
+                body = session_fit(self.admin.env.record_dir, name[:-len('.fit')])
+            except (OSError, ValueError, KeyError) as exc:
+                self.send_error(404, f'No FIT for this session: {exc}')
+                return
+            kind = 'application/vnd.ant.fit'
+        elif not re.fullmatch(r'session_\d{8}_\d{6}(_ble_raw\.jsonl|\.csv|\.json)', name):
             self.send_error(404)
             return
-        path = self.admin.env.record_dir / name
-        if not path.is_file():
-            self.send_error(404)
-            return
-        body = path.read_bytes()
-        kind = 'text/csv' if name.endswith('.csv') else 'application/json'
+        else:
+            path = self.admin.env.record_dir / name
+            if not path.is_file():
+                self.send_error(404)
+                return
+            body = path.read_bytes()
+            kind = 'text/csv' if name.endswith('.csv') else 'application/json'
         self.send_response(200)
-        self.send_header('Content-Type', f'{kind}; charset=utf-8')
+        self.send_header('Content-Type', kind if kind.endswith('.fit') else f'{kind}; charset=utf-8')  # FIT is binary
         self.send_header('Content-Disposition', f'attachment; filename="{name}"')
         self.send_header('Content-Length', str(len(body)))
         self.end_headers()
@@ -327,8 +337,19 @@ class Handler(BaseHTTPRequestHandler):
 
     def read_body(self, limit):
         length = int(self.headers.get('Content-Length', '0'))
-        if length <= 0 or length > limit:
-            raise ValueError('Invalid request size')
+        if length <= 0:
+            raise ValueError('Empty request')
+        if length > limit:
+            # read (and drop) what the client is sending before answering: closing mid-upload would look like a
+            # broken connection ("adapter offline") instead of this clear message
+            remaining = length
+            while remaining > 0:
+                chunk = self.rfile.read(min(remaining, 1024 * 1024))
+                if not chunk:
+                    break
+                remaining -= len(chunk)
+            raise ValueError(f'File too large: {length / 1024 / 1024:.1f} MB (maximum {limit // (1024 * 1024)} MB)'
+                             if limit >= 1024 * 1024 else f'Request too large ({length} bytes, maximum {limit})')
         return self.rfile.read(length)
 
     def read_json(self):

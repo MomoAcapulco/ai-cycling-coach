@@ -43,8 +43,8 @@ trainer-adapter/.venv/bin/python trainer-adapter/tools/zwift_grade_test.py --con
 Los pesos se toman de tu perfil guardado (Ajustes → Perfil). Si aún no lo has guardado, añade
 `--rider-kg <tu peso> --bike-kg <peso de la bici>`.
 
-- [ ] Fichero `diagnostics/zwift_grade_test_*.json` generado
-- [ ] Anotadas tus sensaciones: ¿notaste el 1 % y el 1,5 %? ¿algo brusco? ¿algo a los 60 s? ¿la marcha 13 a los 120 s?
+- [x] Fichero `diagnostics/zwift_grade_test_*.json` generado
+- [x] Anotadas tus sensaciones ("muy naturales y nada exagerados"): ¿notaste el 1 % y el 1,5 %? ¿algo brusco? ¿algo a los 60 s? ¿la marcha 13 a los 120 s?
 
 **Aquí paramos.** Me pasas el fichero y ajusto la aplicación con lo que salga (unos minutos):
 - si el 0 % exacto desactiva las marchas;
@@ -105,8 +105,7 @@ Mismos ajustes que en la prueba 2. Inicia una sesión y prueba, de menos a más:
 - [ ] El panel muestra la pendiente de la carretera, la del rodillo y la enviada
 - [ ] El desnivel de la sesión cuadra con el perfil
 - [ ] Anotado si 20 m por cada 1 % te parece realista, o cuánto pondrías
-- [ ] **Una ruta GPX corta** (página Rutas → «Rodar esta ruta»): las subidas y bajadas de la ruta se notan
-  progresivas, y «Salir de la ruta» no da tirones
+- La ruta GPX con el rodillo pasó a la prueba 5.
 
 ## 4. Opcional: calibrar el modelo de velocidad con Zwift (unos 10 min) — ya no hace falta
 
@@ -133,6 +132,9 @@ Reinicia `./start.sh` para cargar los cambios.
 - [ ] **Una ruta GPX corta** con el rodillo (Rutas → «Rodar esta ruta»): las subidas se notan progresivas y
   «Salir de la ruta» no da tirones
 - [ ] (Tuyo) **Marcha 24 en Zwift**: ¿se parece a lo que notas aquí?
+- [ ] **Modo BTT** (Ajustes → Perfil → Tipo de bici: BTT, guardar y reiniciar `./start.sh`). En la marcha 12 y en
+  llano, el rodillo debe notarse más duro que en carretera (más rodadura): unos 25-40 W más a 18 km/h según el
+  peso. ¿Te parece realista para tierra? La velocidad «en la carretera virtual» debe ser menor que en carretera.
 
 ## Qué me pasas al final
 

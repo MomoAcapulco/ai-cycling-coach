@@ -144,7 +144,7 @@ class AdapterRuntime:
         state = self.state
         if state is not None and state.ride is not None:
             state.ride.set_profile(profile.rider_weight_kg, profile.bike_weight_kg,
-                                   profile.grade_transition_m_per_percent)
+                                   profile.grade_transition_m_per_percent, profile.bike_type)
         if state is not None and state.grade is not None:
             from coach.devices.grade_controller import GradePrefs
             state.grade.set_prefs(GradePrefs.from_profile(profile))
@@ -181,7 +181,7 @@ class AdapterRuntime:
             # The virtual road: physics speed, distance, elevation (the FTMS control test keeps its own grade).
             from coach.session.virtual_ride import VirtualRide
             state.ride = VirtualRide(profile.rider_weight_kg, profile.bike_weight_kg,
-                                     profile.grade_transition_m_per_percent)
+                                     profile.grade_transition_m_per_percent, profile.bike_type)
         if settings.mode == 'WAHOO' and settings.gear_control_enabled and state.ride is not None:
             # Grade on the same native channel as the gears; it only moves when the rider picks a grade.
             from coach.devices.grade_controller import GradeController, GradePrefs
@@ -235,7 +235,9 @@ class AdapterRuntime:
             profile, _saved = self.profile_store.load() if self.profile_store else (None, False)
             from coach.app.rider_profile import RiderProfile
             profile = profile or RiderProfile()
-            shifter = GearShifter(state.controllers, rider_kg=profile.rider_weight_kg, bike_kg=profile.bike_weight_kg)
+            from coach.session.virtual_ride import BIKE_PHYSICS
+            shifter = GearShifter(state.controllers, rider_kg=profile.rider_weight_kg, bike_kg=profile.bike_weight_kg,
+                                  crr_x100000=round(BIKE_PHYSICS[profile.bike_type][1] * 100000))
         if settings.mode == 'WAHOO':
             ble.add('wahoo', lambda scan_lock: bluetooth_worker(
                 state.store, stop, device_id=env.wahoo_device_id,

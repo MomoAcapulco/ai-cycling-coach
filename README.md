@@ -18,6 +18,8 @@ Abre `http://127.0.0.1:5173`. En el **Panel** inicias, pausas y terminas las ses
 
 La aplicación lleva una **carretera virtual**: la velocidad se calcula con física a partir de tus vatios y tu peso (la del rodillo no baja al subir), y con ella la distancia, la altitud y el desnivel acumulado. La pendiente la eliges tú y cambia según avanzas, como en una carretera. Puedes probarla sin rodillo en el simulador: `docs/pruebas/PRUEBA-pendiente-en-el-simulador.md`.
 
+En **Sesiones** puedes descargar cada entrenamiento en **FIT** para subirlo a intervals.icu, Strava o GoldenCheetah.
+
 En **Rutas** subes el GPX de una carrera o de un puerto y lo ruedas: la pendiente sigue su perfil según avanzas, y el Panel muestra el recorrido completo con tu posición.
 
 ## Tus datos

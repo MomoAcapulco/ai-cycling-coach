@@ -73,9 +73,22 @@ class ParseTests(unittest.TestCase):
         profile = segments_profile([(1000, 0)])
         profile[25] = (profile[25][0], profile[25][1] + 200)     # a 200 m spike in the data
         route = parse_gpx(gpx(profile))
-        self.assertLessEqual(max(route.grades), 20)
-        self.assertGreaterEqual(min(route.grades), -15)
+        self.assertLessEqual(max(route.grades), 30)
+        self.assertGreaterEqual(min(route.grades), -30)
         self.assertGreater(route.clipped_steps, 0)
+
+    def test_real_mountain_bike_descents_are_kept(self):
+        route = parse_gpx(gpx(segments_profile([(500, 0), (400, -22), (500, 0)])))   # a -22 % MTB descent
+        self.assertEqual(route.clipped_steps, 0)
+        self.assertAlmostEqual(min(route.grades), -22, delta=0.5)
+
+    def test_a_big_recording_with_extensions_is_read(self):
+        profile = segments_profile([(25_000, 1), (25_000, -1)], step=5)                 # 10 000 points
+        ext = '<time>2026-11-13T10:00:00Z</time><extensions><hr>140</hr><cad>85</cad><power>200</power>' + 'x' * 1300 + '</extensions>'
+        data = gpx(profile).replace(b'</ele>', b'</ele>' + ext.encode())
+        self.assertGreater(len(data), 10 * 1024 * 1024)                                 # bigger than the old 10 MB limit
+        route = parse_gpx(data)
+        self.assertAlmostEqual(route.distance_m, 50_000, delta=50)
 
     def test_refused_files(self):
         cases = {
@@ -137,7 +150,7 @@ class StoreTests(unittest.TestCase):
         for name, data in (('x.gpx', b'<gpx/>'), ('x.csv', gpx(segments_profile(CLIMB))), ('x.gpx', b''),
                            ('x.gpx', b'0' * (10 * 1024 * 1024 + 1))):
             with self.subTest(name=name, size=len(data)), self.assertRaises(ValueError):
-                save_upload(self.folder, name, data)
+                save_upload(self.folder, name, data if len(data) < 10 * 1024 * 1024 else b'0' * (50 * 1024 * 1024 + 1))
         self.assertEqual(list(self.folder.glob('*')) if self.folder.exists() else [], [])
 
     def test_load_only_plain_names(self):
@@ -263,7 +276,8 @@ class RouteEndpointTests(unittest.TestCase):
                 ('POST', '/routes?name=x.txt', None, gpx(segments_profile(CLIMB)), 400),
                 ('POST', '/route/start', {'file': 'nope.gpx'}, None, 404),
                 ('POST', '/route/start', {'file': '../x.gpx'}, None, 404),
-                ('POST', '/route/start', {'file': 3}, None, 400)):
+                ('POST', '/route/start', {'file': 3}, None, 400),
+                ('POST', '/routes?name=huge.gpx', None, b'0' * (50 * 1024 * 1024 + 1), 400)):
             with self.subTest(path=path, body=body), self.assertRaises(HTTPError) as ctx:
                 self.call(method, path, body, raw)
             self.assertEqual(ctx.exception.code, code)

@@ -13,6 +13,7 @@ from threading import Lock
 from typing import Optional
 
 DRIVETRAINS = ('ZWIFT_COG', 'CASSETTE')
+BIKE_TYPES = ('ROAD', 'MTB')   # physics of the virtual road and rolling resistance sent to the trainer (virtual_ride.BIKE_PHYSICS)
 LIMITS = {
     'rider_weight_kg': (30.0, 250.0),
     'bike_weight_kg': (3.0, 40.0),
@@ -28,7 +29,8 @@ LIMITS = {
 FIELDS = {'riderWeightKg': 'rider_weight_kg', 'bikeWeightKg': 'bike_weight_kg', 'ftpWatts': 'ftp_watts',
           'drivetrain': 'drivetrain', 'gradeDifficultyPercent': 'grade_difficulty_percent',
           'gradeDescentFactorPercent': 'grade_descent_factor_percent', 'maxGradePercent': 'max_grade_percent',
-          'minGradePercent': 'min_grade_percent', 'gradeTransitionMetersPerPercent': 'grade_transition_m_per_percent'}
+          'minGradePercent': 'min_grade_percent', 'gradeTransitionMetersPerPercent': 'grade_transition_m_per_percent',
+          'bikeType': 'bike_type'}
 WHOLE_NUMBERS = ('grade_difficulty_percent', 'grade_descent_factor_percent')
 DECIMALS = ('rider_weight_kg', 'bike_weight_kg', 'max_grade_percent', 'min_grade_percent',
             'grade_transition_m_per_percent')
@@ -45,6 +47,7 @@ class RiderProfile:
     max_grade_percent: float = 10.0         # effective grade caps, after difficulty
     min_grade_percent: float = -5.0
     grade_transition_m_per_percent: float = 20.0  # 0 → 5 % over ~100 m, like a real road
+    bike_type: str = 'ROAD'
 
     @property
     def total_mass_kg(self) -> float:
@@ -56,7 +59,7 @@ class RiderProfile:
                 'gradeDifficultyPercent': self.grade_difficulty_percent,
                 'gradeDescentFactorPercent': self.grade_descent_factor_percent,
                 'maxGradePercent': self.max_grade_percent, 'minGradePercent': self.min_grade_percent,
-                'gradeTransitionMetersPerPercent': self.grade_transition_m_per_percent}
+                'gradeTransitionMetersPerPercent': self.grade_transition_m_per_percent, 'bikeType': self.bike_type}
 
     def updated(self, data: dict) -> 'RiderProfile':
         if not isinstance(data, dict):
@@ -72,6 +75,9 @@ class RiderProfile:
             if field == 'drivetrain':
                 if value not in DRIVETRAINS:
                     raise ValueError(f'drivetrain must be one of {", ".join(DRIVETRAINS)}')
+            elif field == 'bike_type':
+                if value not in BIKE_TYPES:
+                    raise ValueError(f'bikeType must be one of {", ".join(BIKE_TYPES)}')
             elif field == 'ftp_watts':
                 if value is not None and (type(value) is not int):
                     raise ValueError('ftpWatts must be a whole number of watts or empty')
@@ -92,6 +98,8 @@ class RiderProfile:
                 raise ValueError(f'{field} must be between {low:g} and {high:g}')
         if self.drivetrain not in DRIVETRAINS:
             raise ValueError(f'drivetrain must be one of {", ".join(DRIVETRAINS)}')
+        if self.bike_type not in BIKE_TYPES:
+            raise ValueError(f'bikeType must be one of {", ".join(BIKE_TYPES)}')
         return self
 
 

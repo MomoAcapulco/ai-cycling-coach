@@ -104,7 +104,8 @@ export function Routes({ data }: { data: Telemetry | null }) {
                 {active?.active && r.file === current
                   ? <RouteProfile profile={active.profile} progressKm={data?.routeProgressKm ?? active.progressKm} compact />
                   : previews[r.file] && <RouteProfile profile={previews[r.file]} progressKm={null} compact />}
-                {!!r.clippedSteps && <p className="tiny warn">El GPX tenía {r.clippedSteps} tramos de 5 m imposibles (fuera de −15 … +20 %): se han recortado.</p>}
+                {!!r.clippedSteps && <p className="tiny warn">El GPX tiene {r.clippedSteps} tramos de 5 m con más de ±30 %, casi seguro errores de altitud del GPX: se han recortado a ±30 %.</p>}
+                {(r.minGradePercent ?? 0) < -5 && <p className="tiny">Las bajadas de más del −5 % se notan en el rodillo como tu límite de bajada (Ajustes → Perfil): el rodillo no puede empujarte cuesta abajo. Sí cuentan para la velocidad y la distancia.</p>}
                 <div className="admin-actions">
                   <button className="primary" disabled={busy || !listing.available || r.file === current} onClick={() => void ride(r)}>
                     {r.file === current ? 'Rodando' : 'Rodar esta ruta'}

@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { fmt } from '../format';
-import type { Drivetrain, RiderProfile } from '../types';
+import type { BikeType, Drivetrain, RiderProfile } from '../types';
 
 type Draft = {
   riderWeightKg: string; bikeWeightKg: string; ftpWatts: string; drivetrain: Drivetrain;
   gradeDifficultyPercent: string; gradeDescentFactorPercent: string; maxGradePercent: string; minGradePercent: string;
   gradeTransitionMetersPerPercent: string;
+  bikeType: BikeType;
 };
 
 const toDraft = (p: RiderProfile): Draft => ({
@@ -15,6 +16,7 @@ const toDraft = (p: RiderProfile): Draft => ({
   gradeDifficultyPercent: String(p.gradeDifficultyPercent), gradeDescentFactorPercent: String(p.gradeDescentFactorPercent),
   maxGradePercent: String(p.maxGradePercent), minGradePercent: String(p.minGradePercent),
   gradeTransitionMetersPerPercent: String(p.gradeTransitionMetersPerPercent),
+  bikeType: p.bikeType ?? 'ROAD',
 });
 
 /** Spanish keyboards type "9,5": accept a comma as the decimal separator. */
@@ -59,7 +61,7 @@ export function ProfileSection() {
       const result = await api.saveProfile({
         riderWeightKg: rider, bikeWeightKg: bike, ftpWatts: ftp, drivetrain: draft.drivetrain,
         gradeDifficultyPercent: difficulty, gradeDescentFactorPercent: descent, maxGradePercent: maxGrade, minGradePercent: minGrade,
-        gradeTransitionMetersPerPercent: transition,
+        gradeTransitionMetersPerPercent: transition, bikeType: draft.bikeType,
       });
       setSaved(result.profile);
       setIsSaved(true);
@@ -88,6 +90,12 @@ export function ProfileSection() {
         <label className="field-block">FTP (opcional)
           <span><input inputMode="numeric" placeholder="no lo sé" value={draft.ftpWatts} onChange={(e) => set({ ftpWatts: e.target.value })} /> W</span>
         </label>
+        <label className="field-block">Tipo de bici
+          <select value={draft.bikeType} onChange={(e) => set({ bikeType: e.target.value as BikeType })}>
+            <option value="ROAD">Carretera</option>
+            <option value="MTB">BTT (montaña)</option>
+          </select>
+        </label>
         <label className="field-block">Transmisión
           <select value={draft.drivetrain} onChange={(e) => set({ drivetrain: e.target.value as Drivetrain })}>
             <option value="ZWIFT_COG">Zwift Cog (marchas virtuales)</option>
@@ -95,6 +103,11 @@ export function ProfileSection() {
           </select>
         </label>
       </div>
+      <p className="tiny">
+        Tipo de bici: cambia la física de la carretera virtual y la rodadura que se manda al rodillo. En BTT vas más erguido
+        y con tacos sobre tierra: más lento en llano (con 200 W y 90 kg en total, unos 27 km/h en vez de 32) y el llano se nota más duro en
+        el rodillo. En subida casi no cambia. Los valores de BTT son una estimación, aún sin validar con el rodillo.
+      </p>
       <h3 className="subheading">Pendiente en el rodillo</h3>
       <div className="profile-grid">
         <label className="field-block">Dificultad (0–100)

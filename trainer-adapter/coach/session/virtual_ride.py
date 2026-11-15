@@ -38,16 +38,24 @@ G = 9.80665
 RHO = 1.225
 CDA_M2 = 0.40
 CRR = 0.004
+# Bike type (rider profile): (CdA m², Crr). ROAD validated with the trainer (see above). MTB is an ESTIMATE, not
+# validated yet: a more upright position (Incyclist uses cwA 0.57 for an average mountain biker against 0.35 on a
+# road bike) and knobbly tyres on dirt and gravel (Crr about 0.008-0.015 in published measurements; 0.010 for a
+# marathon mixing tracks and trails). The same Crr is sent to the trainer, so flats also feel like dirt.
+BIKE_PHYSICS = {'ROAD': (0.40, 0.004), 'MTB': (0.55, 0.010)}
 WHEELS_KG = 1.5
 SPEED_FLOOR_MS = 1.0
 MAX_STEP_S = 0.25
 
 
 class VirtualRide:
-    def __init__(self, rider_kg: float = 75.0, bike_kg: float = 9.0, meters_per_percent: float = 20.0):
+    def __init__(self, rider_kg: float = 75.0, bike_kg: float = 9.0, meters_per_percent: float = 20.0,
+                 bike_type: str = 'ROAD'):
         self.lock = Lock()
         self.rider_kg, self.bike_kg = rider_kg, bike_kg
         self.meters_per_percent = meters_per_percent
+        self.bike_type = bike_type
+        self.cda, self.crr = BIKE_PHYSICS[bike_type]
         self.target_grade: Optional[float] = None   # None: the rider has not chosen (flat start)
         self.road_grade = 0.0
         self.speed_ms = 0.0
@@ -86,9 +94,12 @@ class VirtualRide:
     def route_progress_m(self) -> float:
         return 0.0 if self.route is None else min(self.distance_m - self.route_start_m, self.route.distance_m)
 
-    def set_profile(self, rider_kg: float, bike_kg: float, meters_per_percent: float):
+    def set_profile(self, rider_kg: float, bike_kg: float, meters_per_percent: float, bike_type: str = None):
         with self.lock:
             self.rider_kg, self.bike_kg, self.meters_per_percent = rider_kg, bike_kg, meters_per_percent
+            if bike_type is not None:
+                self.bike_type = bike_type
+                self.cda, self.crr = BIKE_PHYSICS[bike_type]
 
     @property
     def mass_kg(self) -> float:
@@ -116,8 +127,8 @@ class VirtualRide:
         mass = self.mass_kg
         drive = power / max(self.speed_ms, SPEED_FLOOR_MS) if power > 0 else 0.0
         gravity = mass * G * math.sin(theta)
-        rolling = mass * G * CRR * math.cos(theta)
-        air = 0.5 * RHO * CDA_M2 * self.speed_ms ** 2
+        rolling = mass * G * self.crr * math.cos(theta)
+        air = 0.5 * RHO * self.cda * self.speed_ms ** 2
         push = drive - gravity - air
         if self.speed_ms <= 0 and push <= rolling:
             new_speed = 0.0                         # standing still: rolling resistance holds it, no roll-back
@@ -140,13 +151,14 @@ class VirtualRide:
                 self.road_grade += math.copysign(change, goal - self.road_grade)
 
     @staticmethod
-    def steady_speed_ms(power_w: float, grade_percent: float, mass_kg: float) -> float:
+    def steady_speed_ms(power_w: float, grade_percent: float, mass_kg: float, bike_type: str = None) -> float:
         """Speed where the forces balance (for tests and documentation)."""
+        cda, crr = BIKE_PHYSICS[bike_type] if bike_type else (CDA_M2, CRR)
         theta = math.atan(grade_percent / 100)
-        resist = mass_kg * G * (math.sin(theta) + CRR * math.cos(theta))
+        resist = mass_kg * G * (math.sin(theta) + crr * math.cos(theta))
 
         def excess(v):
-            return power_w - v * (resist + 0.5 * RHO * CDA_M2 * v * v)
+            return power_w - v * (resist + 0.5 * RHO * cda * v * v)
         low, high = 0.0, 40.0
         if excess(1e-6) <= 0:
             return 0.0
@@ -168,6 +180,7 @@ class VirtualRide:
                 'vamMh': round(max(0.0, self.vertical_ms) * 3600),
                 'wattsPerKg': round(power_w / self.rider_kg, 2) if power_w and self.rider_kg else None,
                 'gradeTransitionMetersPerPercent': self.meters_per_percent,
+                'bikeType': self.bike_type,
                 'routeFile': self.route.file if self.route else None,
                 'routeName': self.route.name if self.route else None,
                 'routeDistanceKm': round(self.route.distance_m / 1000, 3) if self.route else None,

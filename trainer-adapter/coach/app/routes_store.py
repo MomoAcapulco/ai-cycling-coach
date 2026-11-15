@@ -10,7 +10,7 @@ from threading import Lock
 
 from coach.session.route import Route, RouteError, parse_gpx
 
-MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+MAX_UPLOAD_BYTES = 50 * 1024 * 1024   # recordings of a 24 h ride with heart rate, cadence… reach tens of MB
 SAFE_NAME = re.compile(r'[^A-Za-z0-9._-]+')
 _cache = {}          # (path, mtime, size) -> Route: parsing a big GPX on every listing would be slow
 _cache_lock = Lock()

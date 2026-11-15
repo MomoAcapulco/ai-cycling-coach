@@ -37,6 +37,9 @@ def gear_for_ratio(ratio_x10000: int) -> Optional[int]:
 
 HARD_INCLINE_LIMITS_X100 = (-1000, 2000)  # -10 % .. +20 %, whatever the rider profile says
 DEFAULT_SIMULATION = Simulation()
+# Rolling resistance the trainer may be given: one per bike type of the rider profile (virtual_ride.BIKE_PHYSICS:
+# road 0.004, mountain bike 0.010), and nothing else.
+ALLOWED_CRR_X100000 = (400, 1000)
 
 
 def check_outgoing(uuid: str, data: bytes, incline_limits=None):
@@ -64,8 +67,8 @@ def check_outgoing(uuid: str, data: bytes, incline_limits=None):
         if simulation is not None:
             if (simulation.get('windX100', 0) != DEFAULT_SIMULATION.wind_x100
                     or simulation.get('cwaX10000') != DEFAULT_SIMULATION.cwa_x10000
-                    or simulation.get('crrX100000') != DEFAULT_SIMULATION.crr_x100000):
-                raise PermissionError('only the incline may change in a Simulation (wind, CdA, Crr fixed)')
+                    or simulation.get('crrX100000') not in ALLOWED_CRR_X100000):
+                raise PermissionError('only the incline and the bike type Crr may change in a Simulation')
             incline = simulation.get('inclineX100', 0)
             if incline != START_INCLINE_X100:
                 if incline_limits is None:
@@ -94,9 +97,10 @@ class SafeZwiftWriter:
 
 class GearShifter:
     def __init__(self, controllers, rider_kg: float, bike_kg: float, clock=monotonic,
-                 coalesce_s=0.08, confirm_timeout_s=1.0, max_retries=3, min_cadence=40):
+                 coalesce_s=0.08, confirm_timeout_s=1.0, max_retries=3, min_cadence=40, crr_x100000=400):
         self.controllers = controllers
         self.rider_kg, self.bike_kg = rider_kg, bike_kg
+        self.crr_x100000 = crr_x100000   # rolling resistance of the bike type (rider profile)
         self.clock = clock
         self.coalesce_s, self.confirm_timeout_s = coalesce_s, confirm_timeout_s
         self.max_retries, self.min_cadence = max_retries, min_cadence
@@ -136,7 +140,7 @@ class GearShifter:
     async def start(self, writer):
         """After connecting (or reconnecting): RideOn, 0.4 %, then the gear the rider is in."""
         await writer.write(RIDE_ON_TRAINER)
-        await writer.write(encode_hub_command(simulation=Simulation(incline_x100=START_INCLINE_X100)))
+        await writer.write(encode_hub_command(simulation=Simulation(incline_x100=START_INCLINE_X100, crr_x100000=self.crr_x100000)))
         self.retries = 0
         await self._send_gear(writer, self.controllers.requested_gear())
 
@@ -167,7 +171,7 @@ class GearShifter:
 
     async def finish(self, writer):
         """Leave the trainer in the known neutral state (gear 12, 0.4 %)."""
-        await writer.write(encode_hub_command(simulation=Simulation(incline_x100=START_INCLINE_X100)))
+        await writer.write(encode_hub_command(simulation=Simulation(incline_x100=START_INCLINE_X100, crr_x100000=self.crr_x100000)))
         await writer.write(self._gear_message(NEUTRAL_GEAR))
         self.controllers.force_gear(NEUTRAL_GEAR)
         self.status = 'STOPPED'

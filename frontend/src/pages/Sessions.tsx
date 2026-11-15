@@ -70,6 +70,8 @@ export function Sessions() {
           )}
           <div className="admin-actions">
             <button disabled={busy} onClick={() => void replay(s)}>Ver en replay</button>
+            <a className="button-link primary" href={sessionFileUrl(`${s.session}.fit`)} download
+              title="Para intervals.icu, Strava, GoldenCheetah, TrainingPeaks…">Descargar FIT</a>
             {s.files.map((f) => (
               <a key={f} className="button-link" href={sessionFileUrl(f)} download>
                 Descargar {f.endsWith('.csv') ? 'CSV' : f.endsWith('_ble_raw.jsonl') ? 'captura Bluetooth' : 'resumen'}

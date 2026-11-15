@@ -21,8 +21,12 @@ Profile:
     ends; gain = sum of its rises. Unchanged on purpose: no method measured (ours, Serpentine's 1 m threshold,
     GoldenCheetah's 3 m threshold, gpxpy's light smoothing) was best both with GPS noise and with small real
     rollers; to be decided with real race GPX files against their official gain.
-- Grades are clipped to what the rider may ask (grade_controller.TARGET_RANGE, -15 … +20 %); how many 5 m steps
-  were clipped is reported.
+- Grades are clipped to ``ROUTE_GRADE_RANGE`` (±30 %); how many 5 m steps were clipped is reported (almost surely
+  GPX errors). Wider than the ±15/20 % of the grade buttons on purpose: mountain-bike routes have real descents of
+  -20 % and more (measured: 1.4 km under -15 % in a MTB marathon). The trainer never feels them as such: the rider's
+  limits (-5 % by default) apply after the difficulty, and the trainer cannot push the rider downhill anyway.
+- Read in one streaming pass (``iterparse``, every point freed once read), so big recordings (tens of MB) do not
+  need hundreds of MB of memory.
 
 On the virtual road (coach/session/virtual_ride.py) the TARGET grade is the profile's grade at the distance
 ridden since the route started; the road grade still moves towards it by at most 1 % every 20 m, so even a
@@ -40,7 +44,8 @@ GRADE_SMOOTH_RADIUS_M = 30.0  # grade profile (Serpentine): ±30 m average …
 GRADE_SMOOTH_PASSES = 3       # … applied 3 times …
 GRADE_HALF_BASE_M = 20.0      # … then central difference over ±20 m
 MIN_DISTANCE_M = 200.0
-MAX_POINTS = 200_000
+MAX_POINTS = 500_000           # a 24 h recording at 1 point per second is 86 400
+ROUTE_GRADE_RANGE = (-30.0, 30.0)  # beyond this a GPX step is almost surely an error; real MTB descents reach -25 %
 EARTH_RADIUS_M = 6_371_000
 
 
@@ -87,6 +92,41 @@ class Route:
         return out
 
 
+def _read_points(data: bytes):
+    """(name, [(lat, lon, ele)]): the track points, or the route points if there is no track."""
+    import io
+    name, track, route, root_checked = None, [], [], False
+    try:
+        for event, element in ET.iterparse(io.BytesIO(data), events=('start', 'end')):
+            tag = _local(element.tag)
+            if event == 'start':
+                if not root_checked:
+                    if tag != 'gpx':
+                        raise RouteError('Not a GPX file (the root element is not <gpx>)')
+                    root_checked = True
+                continue
+            if tag == 'name' and name is None and (element.text or '').strip():
+                name = element.text.strip()[:120]
+            elif tag in ('trkpt', 'rtept'):
+                ele = next((c.text for c in element if _local(c.tag) == 'ele'), None)
+                try:
+                    lat, lon = float(element.get('lat')), float(element.get('lon'))
+                    elevation = float(ele) if ele is not None else None
+                except (TypeError, ValueError):
+                    raise RouteError('A point has no valid lat/lon/ele')
+                if elevation is None:
+                    raise RouteError('The route has no elevation (<ele>): export it with elevation')
+                if not (-90 <= lat <= 90 and -180 <= lon <= 180) or not math.isfinite(elevation):
+                    raise RouteError('A point has coordinates or elevation out of range')
+                (track if tag == 'trkpt' else route).append((lat, lon, elevation))
+                if len(track) + len(route) > MAX_POINTS:
+                    raise RouteError(f'More than {MAX_POINTS} points')
+                element.clear()   # free the point and its children (time, hr, extensions…)
+    except ET.ParseError as exc:
+        raise RouteError(f'Not valid XML: {exc}')
+    return name, track or route
+
+
 def _local(tag: str) -> str:
     return tag.rsplit('}', 1)[-1]
 
@@ -99,40 +139,9 @@ def haversine_m(lat1, lon1, lat2, lon2) -> float:
 
 
 def parse_gpx(data: bytes, file: str = 'route.gpx') -> Route:
-    from coach.devices.grade_controller import TARGET_RANGE
     if re.search(rb'<!(DOCTYPE|ENTITY)', data[:4096] + data[-4096:], re.I) or re.search(rb'<!ENTITY', data, re.I):
         raise RouteError('GPX files with DOCTYPE/ENTITY declarations are not accepted')
-    try:
-        root = ET.fromstring(data)
-    except ET.ParseError as exc:
-        raise RouteError(f'Not valid XML: {exc}')
-    if _local(root.tag) != 'gpx':
-        raise RouteError('Not a GPX file (the root element is not <gpx>)')
-
-    name = None
-    points = []
-    for kind in ('trkpt', 'rtept'):
-        for element in root.iter():
-            tag = _local(element.tag)
-            if name is None and tag == 'name' and (element.text or '').strip():
-                name = element.text.strip()[:120]
-            if tag != kind:
-                continue
-            ele = next((c.text for c in element if _local(c.tag) == 'ele'), None)
-            try:
-                lat, lon = float(element.get('lat')), float(element.get('lon'))
-                elevation = float(ele) if ele is not None else None
-            except (TypeError, ValueError):
-                raise RouteError('A point has no valid lat/lon/ele')
-            if elevation is None:
-                raise RouteError('The route has no elevation (<ele>): export it with elevation')
-            if not (-90 <= lat <= 90 and -180 <= lon <= 180) or not math.isfinite(elevation):
-                raise RouteError('A point has coordinates or elevation out of range')
-            points.append((lat, lon, elevation))
-            if len(points) > MAX_POINTS:
-                raise RouteError(f'More than {MAX_POINTS} points')
-        if points:
-            break
+    name, points = _read_points(data)
     if len(points) < 2:
         raise RouteError('The GPX has fewer than 2 points with elevation')
 
@@ -145,7 +154,7 @@ def parse_gpx(data: bytes, file: str = 'route.gpx') -> Route:
 
     raw = _resample(distances, [p[2] for p in points], total)
     elevations = _smooth(raw, int(SMOOTH_M // STEP_M))
-    low, high = TARGET_RANGE
+    low, high = ROUTE_GRADE_RANGE
     grades, clipped = [], 0
     for grade in _grades(raw, total):
         if not low <= grade <= high:
