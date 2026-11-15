@@ -127,6 +127,8 @@ class AdapterState:
     grade: Optional[object] = None
     # coach.session.virtual_ride.VirtualRide: the virtual road (physics speed, distance, elevation); not in REPLAY.
     ride: Optional[object] = None
+    # coach.workouts.ramp_test.RampTest (the FTP test) while one is running or its result is shown.
+    workout: Optional[object] = None
 
     def __post_init__(self):
         if self.mode not in MODES:
@@ -142,10 +144,25 @@ HR_DISABLED = {
 }
 
 
+SIMULATED_RIDER_LIMIT_W = 260   # in SIMULATOR the simulated rider follows a workout target up to this power
+
+
 def trainer_reading(state: 'AdapterState') -> dict:
     """The trainer (or simulator, or replay) alone, without HR, controllers or the virtual road."""
     if state.mode == 'SIMULATOR':
-        return telemetry(monotonic() - state.started)
+        reading = telemetry(monotonic() - state.started)
+        workout = state.workout
+        if workout is not None and workout.phase in ('WARMUP', 'RAMP'):
+            # a simulated rider for trying the FTP test without a trainer: easy warm-up, follows the target up
+            # to SIMULATED_RIDER_LIMIT_W, then gives up (stops pedalling)
+            target = workout.target_w()
+            if target is None:
+                reading.update(powerWatts=120, cadenceRpm=85)
+            elif target <= SIMULATED_RIDER_LIMIT_W:
+                reading.update(powerWatts=target, cadenceRpm=85)
+            else:
+                reading.update(powerWatts=0, cadenceRpm=0)
+        return reading
     if state.mode == 'REPLAY':
         return state.replay.snapshot()
     return state.store.snapshot()
@@ -169,6 +186,8 @@ def current_reading(state: 'AdapterState') -> dict:
         reading['gradeControlMode'] = 'SIMULATED' if state.mode == 'SIMULATOR' else None
     if state.grade is not None:
         reading.update(state.grade.snapshot())  # gradeControlMode TRAINER, effective/sent grade
+    if state.workout is not None:
+        reading.update(state.workout.snapshot())  # FTP test: phase, target, step, best minute, result
     reading['mode'] = state.mode
     return reading
 
@@ -407,6 +426,14 @@ class Handler(BaseHTTPRequestHandler):
                 from coach.app.routes_store import MAX_UPLOAD_BYTES as MAX_GPX, save_upload as save_route
                 name = (parse_qs(urlsplit(self.path).query).get('name') or [''])[0]
                 self.respond(save_route(self.admin.env.routes_dir, name, self.read_body(MAX_GPX)), 201)
+                return
+            if path in ('/workout/ramp/start', '/workout/stop', '/workout/ftp/save', '/workout/clear') \
+                    and self.admin is not None:
+                body = self.read_json() if path == '/workout/ramp/start' and int(self.headers.get('Content-Length', '0')) else {}
+                action = {'/workout/ramp/start': lambda: self.admin.start_ramp_test(body),
+                          '/workout/stop': self.admin.stop_workout, '/workout/ftp/save': self.admin.save_test_ftp,
+                          '/workout/clear': self.admin.clear_workout}[path]
+                self.respond(action())
                 return
             if path in ('/route/start', '/route/stop') and self.admin is not None:
                 reason = self.route_unavailable()

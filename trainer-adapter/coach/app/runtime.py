@@ -26,6 +26,18 @@ STOP_TIMEOUT_SECONDS = 8
 RIDE_TICK_SECONDS = 0.25
 
 
+def workout_ticker(state, test, stop, tick=1.0):
+    """Feeds the FTP test with the 1 Hz telemetry until it ends (or the configuration changes)."""
+    from coach.app.server import current_reading
+    while not stop.wait(tick):
+        if state.workout is not test or test.phase not in ('WARMUP', 'RAMP'):
+            return
+        try:
+            test.tick(current_reading(state))
+        except Exception as exc:  # the test must never take the adapter down
+            print(f'WARNING: FTP test tick failed: {exc}', flush=True)
+
+
 def ride_ticker(state, stop, tick=RIDE_TICK_SECONDS, clock=None):
     """Moves the virtual rider 4 times a second with the live power (coach/session/virtual_ride.py)."""
     from time import monotonic
@@ -149,6 +161,54 @@ class AdapterRuntime:
         if state is not None and state.grade is not None:
             from coach.devices.grade_controller import GradePrefs
             state.grade.set_prefs(GradePrefs.from_profile(profile))
+
+    # ---- FTP test (coach/workouts/ramp_test.py) ----
+    def start_ramp_test(self, options: dict):
+        """Start the ramp FTP test (and a session to record it, if none is running)."""
+        from coach.workouts.ramp_test import RampTest
+        state = self.state
+        if state.mode == 'REPLAY':
+            raise PermissionError('The FTP test needs the trainer or the simulator, not REPLAY')
+        if state.workout is not None and state.workout.phase in ('WARMUP', 'RAMP'):
+            raise PermissionError('A test is already running')
+        if state.ride is not None and state.ride.route is not None and not state.ride.route_finished:
+            raise PermissionError('Leave the route first: the test is ridden on the flat')
+        ftp = self._ftp()
+        start_w = options.get('startW', max(50, int(round(ftp * 0.4 / 10) * 10)) if ftp else 100)
+        step_w = options.get('stepW', 20)
+        for name, value, low, high in (('startW', start_w, 50, 300), ('stepW', step_w, 10, 40)):
+            if type(value) is not int or not low <= value <= high:
+                raise ValueError(f'{name} must be a whole number between {low} and {high}')
+        if self.session is not None and self.session.snapshot()['sessionState'] == 'IDLE':
+            self.session.start()
+        test = RampTest(start_w=start_w, step_w=step_w)
+        state.workout = test
+        stop = self._stop
+        if self.start_workers and stop is not None:
+            Thread(target=workout_ticker, args=(state, test, stop), daemon=True, name='ramp-test').start()
+        return test.snapshot()
+
+    def stop_workout(self):
+        if self.state.workout is None:
+            raise PermissionError('No test is running')
+        self.state.workout.finish('rider finished')
+        return self.state.workout.snapshot()
+
+    def save_test_ftp(self):
+        test = self.state.workout
+        if test is None or test.ftp is None:
+            raise PermissionError('There is no FTP result to save')
+        if self.profile_store is None:
+            raise PermissionError('No rider profile store')
+        profile = self.profile_store.update({'ftpWatts': test.ftp})
+        self.profile_changed(profile)
+        return {'ftpWatts': profile.ftp_watts}
+
+    def clear_workout(self):
+        if self.state.workout is not None and self.state.workout.phase in ('WARMUP', 'RAMP'):
+            raise PermissionError('Stop the test first')
+        self.state.workout = None
+        return {'workout': None}
 
     def _rider_kg(self):
         if self.profile_store is None:

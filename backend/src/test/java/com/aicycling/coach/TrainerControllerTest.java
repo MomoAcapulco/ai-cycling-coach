@@ -200,6 +200,16 @@ class TrainerControllerTest {
     }
 
     @Test
+    void rampTestIsForwarded() throws Exception {
+        REPLIES.put("/workout/ramp/start", new Reply(200, "{\"workoutPhase\":\"WARMUP\"}"));
+        mvc.perform(post("/api/trainer/workout/ramp/start"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.workoutPhase").value("WARMUP"));
+        REPLIES.put("/workout/ftp/save", new Reply(409, "There is no FTP result to save"));
+        mvc.perform(post("/api/trainer/workout/ftp/save")).andExpect(status().isConflict());
+    }
+
+    @Test
     void historyIsForwarded() throws Exception {
         REPLIES.put("/history/weeks", new Reply(200, "{\"weeks\":[{\"week\":\"2026-11-09\"}]}"));
         mvc.perform(get("/api/trainer/history/weeks"))

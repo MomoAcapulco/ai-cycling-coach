@@ -4,6 +4,7 @@ import { average, clock } from '../format';
 import type { ActiveRoute, Sample, Session, Telemetry } from '../types';
 import { ElevationProfile, GradeProfile, RouteProfile, TraceChart } from '../components/Charts';
 import { GradePanel } from '../components/GradePanel';
+import { RampTestPanel } from '../components/RampTestPanel';
 import { GearPanel, Metrics, ReplayPlayer, SessionStats, StatusBar } from '../components/Panels';
 import { SessionBar } from '../components/SessionBar';
 
@@ -121,6 +122,7 @@ export function Dashboard({ data, error, history }: { data: Telemetry | null; er
         <section className="right">
           <GearPanel data={data} replay={replay} onError={setActionError} />
           {(data?.gradeControlMode === 'TRAINER' || data?.gradeControlMode === 'SIMULATED') && <GradePanel data={data} onError={setActionError} />}
+          {!replay && <RampTestPanel data={data} power3s={power3s} onError={setActionError} />}
           <SessionStats data={data} points={points} />
         </section>
       </div>

@@ -75,6 +75,13 @@ Historial de versiones (lo que antes estaba en un README por versión). La más 
   - Al iniciar una sesión nueva, las gráficas, el perfil del recorrido y la pendiente máxima **empiezan de cero**, con el tiempo de la sesión. Antes arrastraban todo lo anterior. Al terminar, la última sesión se queda en pantalla hasta empezar otra.
   - Botones ±0,5 % de la pendiente: varias pulsaciones seguidas solo contaban una por segundo, porque cada pulsación sumaba a la última lectura de telemetría y el botón se bloqueaba mientras se enviaba. Ahora cada pulsación suma al instante y se envía una sola vez, 0,3 s después de la última, con el total. El deslizador no tenía el problema.
   - Pulsómetro: si no se ve la banda, el Panel ya dice qué comprobar (que esté puesta y humedecida, y que no esté conectada a un reloj, al móvil o a Zwift) y la terminal lo escribe una vez. Antes solo ponía «WAITING».
+- **Test de FTP (rampa, sin ERG)** (`coach/workouts/ramp_test.py`, panel «Test de FTP» en el Panel):
+  - Protocolo: 5 minutos suaves y luego escalones de 1 minuto desde 100 W (o el 40 % de tu FTP), +20 W por minuto. El objetivo se alcanza con las marchas; termina al dejar de pedalear 5 s o con «He terminado».
+  - FTP = 75 % del mejor minuto de la rampa. Si la rampa dura menos de 3 minutos, no se da resultado.
+  - «Guardar como mi FTP» lo pasa al perfil, y desde ahí se calculan IF y TSS (sesiones y FIT).
+  - Se graba como sesión. No manda nada al rodillo: solo lee la telemetría.
+  - En el simulador, un ciclista simulado sigue el objetivo hasta 260 W, para probarlo sin rodillo.
+  - API `POST /workout/ramp/start`, `/workout/stop`, `/workout/ftp/save` y `/workout/clear`.
 - **Historial de actividades** (`coach/history/`, página **Historial**, guía `docs/IMPORTAR-historial.md`):
   - Junta las sesiones de la aplicación (entran solas) con lo importado de una **exportación de Strava** (`tools/import_strava.py`, leída directamente del ZIP). Se guarda en SQLite en la carpeta de datos, con copia de los ficheros originales. Reimportar no duplica.
   - **Lector de FIT propio**, sin dependencias. Contempla cabeceras comprimidas, big endian, campos de desarrollador, ficheros encadenados y valores inválidos. Con las 112 actividades FIT de una exportación real: 109 idénticas al decodificador oficial de Garmin, y en las otras 3 nuestro lector trata como «sin dato» una altitud 0xFFFF que el oficial convierte en 12 607 m.

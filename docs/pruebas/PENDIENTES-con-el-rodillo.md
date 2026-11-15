@@ -136,6 +136,23 @@ Reinicia `./start.sh` para cargar los cambios.
   llano, el rodillo debe notarse más duro que en carretera (más rodadura): unos 25-40 W más a 18 km/h según el
   peso. ¿Te parece realista para tierra? La velocidad «en la carretera virtual» debe ser menor que en carretera.
 
+## 6. Test de FTP (unos 20–25 min, esfuerzo máximo)
+
+Hazlo **descansado**, en un día sin entrenamiento fuerte la víspera. Si notas mareo, dolor en el pecho o algo raro,
+deja de pedalear: el test termina solo.
+
+1. `./start.sh` → modo **Rodillo real** con control de marchas. Pon el **pulsómetro**: el test anota tu pulso
+   máximo.
+2. En el **Panel → Test de FTP → Empezar test de FTP**. Se inicia la sesión sola.
+3. **5 minutos suaves.** Después el objetivo sube 20 W cada minuto: **súbelo con las marchas**, a una cadencia
+   cómoda (80–90 rpm). El panel te dice si vas por debajo o por encima.
+4. Aguanta **hasta que no puedas mantener el objetivo**. Entonces deja de pedalear: termina solo.
+5. Pulsa **Guardar como mi FTP**, rueda suave unos minutos y **Termina** la sesión.
+
+- [ ] FTP estimado y guardado: ____ W (y el pulso máximo: ____ ppm)
+- [ ] ¿Ha sido fácil seguir el objetivo con las marchas, o los saltos de 20 W eran incómodos con las marchas
+  que tienes?
+
 ## Qué me pasas al final
 
 - Todos los ficheros de `diagnostics/` nuevos.
