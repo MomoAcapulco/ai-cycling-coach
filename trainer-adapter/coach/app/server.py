@@ -235,6 +235,9 @@ class Handler(BaseHTTPRequestHandler):
             self.respond({'active': True, **ride.route.summary(), 'profile': ride.route.profile(),
                           'progressKm': snap['routeProgressKm'], 'finished': snap['routeFinished']})
             return
+        if path in ('/history', '/history/weeks') and self.admin is not None:
+            self.respond(self.history_json(path.endswith('/weeks')))
+            return
         if path == '/sessions' and self.admin is not None:
             from coach.session.session import list_sessions
             self.respond({'sessions': list_sessions(self.admin.env.record_dir)})
@@ -273,6 +276,33 @@ class Handler(BaseHTTPRequestHandler):
             'status': 'UP', 'mode': state.mode, 'trainerConnected': reading['connected'],
             'trainerStatus': reading['status']}
         self.respond(data)
+
+    def history_json(self, weeks: bool):
+        """Every activity (this app's sessions are added on the fly), or totals per week (Monday to Sunday)."""
+        from coach.history.store import HistoryStore, import_app_sessions
+        env = self.admin.env
+        store = HistoryStore(env.history_db) if env.history_db else HistoryStore.default()
+        import_app_sessions(store, env.record_dir)
+        rows = store.list(5000)
+        if not weeks:
+            return {'activities': rows[:500], 'counts': store.count_by(), 'database': str(store.path)}
+        from datetime import datetime, timedelta
+        totals = {}
+        for row in rows:
+            if not row.get('start_utc'):
+                continue
+            day = datetime.fromisoformat(row['start_utc']).date()
+            monday = (day - timedelta(days=day.weekday())).isoformat()
+            week = totals.setdefault(monday, {'week': monday, 'hours': {}, 'activities': 0, 'distanceKm': 0.0,
+                                              'ascentM': 0.0, 'workKj': 0.0})
+            week['activities'] += 1
+            kind = row['type']
+            week['hours'][kind] = round(week['hours'].get(kind, 0) + (row.get('moving_s') or row.get('elapsed_s') or 0) / 3600, 2)
+            if kind in ('ride', 'virtual_ride'):
+                week['distanceKm'] = round(week['distanceKm'] + (row.get('distance_m') or 0) / 1000, 1)
+                week['ascentM'] = round(week['ascentM'] + (row.get('ascent_m') or 0))
+                week['workKj'] = round(week['workKj'] + (row.get('work_kj') or 0))
+        return {'weeks': sorted(totals.values(), key=lambda w: w['week'])}
 
     def route_unavailable(self):
         """Why the grade (by hand or from a route) cannot be chosen now, or None."""

@@ -200,6 +200,16 @@ class TrainerControllerTest {
     }
 
     @Test
+    void historyIsForwarded() throws Exception {
+        REPLIES.put("/history/weeks", new Reply(200, "{\"weeks\":[{\"week\":\"2026-11-09\"}]}"));
+        mvc.perform(get("/api/trainer/history/weeks"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.weeks[0].week").value("2026-11-09"));
+        REPLIES.put("/history", new Reply(200, "{\"activities\":[]}"));
+        mvc.perform(get("/api/trainer/history")).andExpect(status().isOk());
+    }
+
+    @Test
     void gpxRoutesAreForwarded() throws Exception {
         REPLIES.put("/routes", new Reply(201, "{\"file\":\"climb.gpx\"}"));
         mvc.perform(post("/api/trainer/routes?name=climb.gpx").contentType("application/gpx+xml").content("<gpx/>"))

@@ -68,13 +68,13 @@ export function useTelemetry() {
   return { data, error, history };
 }
 
-export type Route = 'panel' | 'rutas' | 'sesiones' | 'ajustes';
+export type Route = 'panel' | 'rutas' | 'sesiones' | 'historial' | 'ajustes';
 
 /** Minimal hash router: #/rutas, #/sesiones, #/ajustes, anything else is the panel. */
 export function useRoute(): Route {
   const read = (): Route => {
     const page = window.location.hash.replace(/^#\/?/, '');
-    return page === 'ajustes' || page === 'sesiones' || page === 'rutas' ? page : 'panel';
+    return page === 'ajustes' || page === 'sesiones' || page === 'rutas' || page === 'historial' ? page : 'panel';
   };
   const [route, setRoute] = useState<Route>(read);
   useEffect(() => {

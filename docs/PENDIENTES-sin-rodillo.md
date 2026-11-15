@@ -12,9 +12,9 @@ Lo que se puede hacer y probar sin el rodillo, en orden. Lo que necesita el rodi
 | 5 | **Test de FTP** (rampa o 20 min) como primer entrenamiento guiado | Pendiente |
 | 6 | **Entrenamientos estructurados**: bloques con objetivo de vatios, primero sin ERG | Pendiente |
 | 7 | **Forma, fatiga y frescura** (CTL, ATL y TSB) con el historial de sesiones | Pendiente |
-| 8 | **Método del desnivel acumulado de las rutas**: decidirlo con GPX reales frente al desnivel oficial | Calculado con tus 3 GPX; falta el desnivel que da Strava de cada uno (abajo) |
+| 8 | **Método del desnivel acumulado de las rutas**: decidirlo con GPX reales frente al desnivel oficial | Hecho (15-11): media de 50 m, a menos del 1 % de Strava en tus 3 rutas (abajo) |
 | 9 | **Rutas generadas**: crear rutas a partir de distancia, desnivel, número de subidas… (abajo) | Pendiente |
-| 10 | **Lo que necesita la IA además de 4–7**: tu objetivo y calendario, tus salidas en la calle, cómo te sientes, historial consultable, reglas y privacidad (abajo) | Pendiente |
+| 10 | **Lo que necesita la IA además de 4–7**: tu objetivo y calendario, tus salidas en la calle, cómo te sientes, historial consultable, reglas y privacidad (abajo) | **10a hecha (15-11)**: historial + importación de Strava (118 actividades). Faltan objetivo y calendario, sensaciones, reglas |
 | 11 | **IA, fase 1: análisis después de cada sesión** | Tras la 4, la 5 y parte de la 10 |
 | 12 | **IA, fase 2: planificación** (semana, ajustes según cómo vas, puesta a punto para la carrera) | Tras la 6, la 7 y la 10 |
 | 13 | **Visual 1: mapa en movimiento** con tu posición en la ruta | Pendiente |
@@ -146,5 +146,15 @@ Las cifras oficiales publicadas no sirven bien de referencia. La Cuna de la Legi
 claro que sea el recorrido de BTT. La Sherry Bike 2026 no publica el desnivel de sus 66,6 km. De La Africana no hay
 datos recientes.
 
-**Lo que necesito**: el **desnivel que muestra Strava** en cada una de esas tres actividades (y, si lo sabes, si el
-dispositivo con el que se grabaron tiene barómetro). Con eso elegimos el método.
+**Decisión (15-11)**, con el desnivel que muestra Strava (Cuna 1 501, Africana 1 118, Sherry 1 038 m):
+
+| Ventana de suavizado | Cuna | Africana | Sherry |
+|---|---|---|---|
+| Sin suavizar | +6,3 % | +7,1 % | +5,6 % |
+| 30 m | +2,4 % | +3,0 % | +2,7 % |
+| **50 m (elegida)** | **−0,2 %** | **+0,4 %** | **+0,8 %** |
+| 100 m (la anterior) | −4,8 % | −5,0 % | −4,0 % |
+
+Los métodos con umbral (Serpentine y GoldenCheetah) daban entre −9 y −14 %, y gpxpy entre +5 y +7 %. Strava es una
+referencia, no la verdad absoluta, pero es la cifra con la que se compara todo el mundo. Si más adelante subes
+GPX de otro tipo (de GPS sin barómetro, o de organizadores), conviene repetir la comparación.

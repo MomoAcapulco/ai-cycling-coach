@@ -74,7 +74,7 @@ public class TrainerController {
      * query string included (recording and route uploads use ?name=), body and Content-Type kept.
      */
     @RequestMapping(value = {"/admin/**", "/devices", "/devices/**", "/session", "/session/**", "/sessions",
-            "/routes", "/routes/**", "/route", "/route/**"},
+            "/routes", "/routes/**", "/route", "/route/**", "/history", "/history/**"},
             method = {RequestMethod.GET, RequestMethod.POST, RequestMethod.DELETE})
     public ResponseEntity<JsonNode> admin(HttpServletRequest servletRequest,
                                           @RequestBody(required = false) byte[] body) {

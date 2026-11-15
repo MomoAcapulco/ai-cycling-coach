@@ -5,7 +5,7 @@ import type { Sample, Telemetry } from '../types';
 
 const MODE_LABEL: Record<string, string> = { SIMULATOR: 'SIMULADOR', WAHOO: 'RODILLO REAL', REPLAY: 'REPLAY · HISTÓRICO' };
 
-export function Header({ version, data, route }: { version: string; data: Telemetry | null; route: 'panel' | 'rutas' | 'sesiones' | 'ajustes' }) {
+export function Header({ version, data, route }: { version: string; data: Telemetry | null; route: 'panel' | 'rutas' | 'sesiones' | 'historial' | 'ajustes' }) {
   const mode = data?.mode ?? data?.source;
   return (
     <header>
@@ -17,6 +17,7 @@ export function Header({ version, data, route }: { version: string; data: Teleme
         <a href="#/" className={route === 'panel' ? 'active' : ''}>Panel</a>
         <a href="#/rutas" className={route === 'rutas' ? 'active' : ''}>Rutas</a>
         <a href="#/sesiones" className={route === 'sesiones' ? 'active' : ''}>Sesiones</a>
+        <a href="#/historial" className={route === 'historial' ? 'active' : ''}>Historial</a>
         <a href="#/ajustes" className={route === 'ajustes' ? 'active' : ''}>Ajustes</a>
         <span className={`mode ${mode === 'REPLAY' ? 'replay' : ''}`}>{mode ? MODE_LABEL[mode] ?? mode : 'CONECTANDO'}</span>
       </nav>

@@ -17,10 +17,12 @@ Profile:
     method (one 100 m average, grade per 10 m step) on synthetic routes: false spikes on a noisy flat road
     1.3 % instead of 2.1 %, a real 1→5 % ramp kept within 70 m instead of 80 m, same mean on a 6 % climb; a
     short 100 m roller of 2 % is felt as 1.4 % instead of 1.6 % (the price of less noise).
-  * ELEVATION and GAIN (the chart and the summary): one centred ``SMOOTH_M`` (100 m) average, reflected at the
-    ends; gain = sum of its rises. Unchanged on purpose: no method measured (ours, Serpentine's 1 m threshold,
-    GoldenCheetah's 3 m threshold, gpxpy's light smoothing) was best both with GPS noise and with small real
-    rollers; to be decided with real race GPX files against their official gain.
+  * ELEVATION and GAIN (the chart and the summary): one centred ``SMOOTH_M`` (50 m) average, reflected at the
+    ends; gain = sum of its rises. Chosen with real files: three mountain-bike marathon recordings exported from
+    Strava (56-74 km, 1 000-1 500 m+), against the gain Strava shows for them. 50 m: -0.2, +0.4 and +0.8 %; the
+    100 m used before: -4 to -5 %; no smoothing +6 to +7 %; the threshold methods (Serpentine 1 m, GoldenCheetah
+    3 m) -9 to -14 %; gpxpy's light smoothing +5 to +7 %. Strava is a reference, not ground truth, but it is the
+    figure riders compare with, and official race figures are usually close to it.
 - Grades are clipped to ``ROUTE_GRADE_RANGE`` (±30 %); how many 5 m steps were clipped is reported (almost surely
   GPX errors). Wider than the ±15/20 % of the grade buttons on purpose: mountain-bike routes have real descents of
   -20 % and more (measured: 1.4 km under -15 % in a MTB marathon). The trainer never feels them as such: the rider's
@@ -39,7 +41,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 
 STEP_M = 5.0
-SMOOTH_M = 100.0            # elevation and gain profile
+SMOOTH_M = 50.0             # elevation and gain profile: chosen against Strava (see the docstring)
 GRADE_SMOOTH_RADIUS_M = 30.0  # grade profile (Serpentine): ±30 m average …
 GRADE_SMOOTH_PASSES = 3       # … applied 3 times …
 GRADE_HALF_BASE_M = 20.0      # … then central difference over ±20 m

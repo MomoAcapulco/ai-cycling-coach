@@ -204,6 +204,20 @@ export type ActiveRoute = { active: false } | (RouteSummary & {
   active: true; progressKm: number; finished: boolean; profile: { d: number; e: number; g: number }[];
 });
 
+export type ActivityType = 'ride' | 'virtual_ride' | 'run' | 'strength' | 'workout' | 'other';
+
+export type Activity = {
+  id: string; source: 'app' | 'strava' | string; start_utc: string | null; type: ActivityType; name: string | null;
+  elapsed_s: number | null; moving_s: number | null; distance_m: number | null; ascent_m: number | null;
+  avg_power: number | null; max_power: number | null; np: number | null; work_kj: number | null;
+  avg_hr: number | null; max_hr: number | null; avg_cadence: number | null; has_power: number; has_hr: number;
+  device: string | null; strava_relative_effort: number | null;
+};
+
+export type HistoryWeek = {
+  week: string; hours: Partial<Record<ActivityType, number>>; activities: number; distanceKm: number; ascentM: number; workKj: number;
+};
+
 export type DeviceRole = 'trainer' | 'heart_rate' | 'zwift_left' | 'zwift_right';
 
 export type DeviceCandidate = { address: string; name: string | null; rssi: number | null };
