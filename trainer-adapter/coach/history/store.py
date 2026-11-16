@@ -28,6 +28,8 @@ COLUMNS = (
     # read once from the activity file (coach/history/load.py), so the load can be recomputed instantly when the
     # rider's FTP or heart-rate thresholds change: seconds at each heart rate, and the best 20 min power
     ('hr_hist', 'TEXT'), ('best20_w', 'REAL'), ('enriched', 'INTEGER'),
+    # best power of each duration from 1 to 60 min, {seconds: watts} (coach/history/ftp_model.py)
+    ('mmp', 'TEXT'),
 )
 TYPES = ('ride', 'virtual_ride', 'run', 'strength', 'workout', 'other')
 GAP_S = 3

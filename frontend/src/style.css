@@ -127,3 +127,6 @@ a.button-link.primary{background:#267659;border-color:#63d5a1;color:#fff;font-we
 .ok-text{color:#7fe7b0}.warn-text{color:#f3b77f}
 @media(max-width:800px){.workout-now{grid-template-columns:1fr 1fr}.workout-now strong{font-size:34px}}
 .workout-line{font-size:13px;color:#cfe3dc;margin:6px 0 10px}.workout-line summary{cursor:pointer}
+.ftp-notice{margin:14px 0}.ftp-notice p{margin:4px 0 10px;font-size:14px;color:#d6e6e0}
+.ftp-notice.raise,.ftp-notice.set{border-color:#63d5a1}.ftp-notice.test{border-color:#b98b5a}
+.ftp-notice .admin-actions{margin-bottom:0}

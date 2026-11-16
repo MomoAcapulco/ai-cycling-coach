@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from coach.history.fit_reader import FitError, read_fit
-from coach.workouts.ramp_test import best_average
+from coach.history.ftp_model import best_averages
 
 BANISTER_B = 1.92
 ESTIMATE_TSS_PER_HOUR = {'ride': 50, 'virtual_ride': 50, 'run': 60, 'strength': 35, 'workout': 40, 'other': 40}
@@ -40,7 +40,8 @@ SPIKE_BPM = 8
 GAP_S = 3          # power older than this is a gap: a cut in the data
 HR_GAP_S = 30      # heart rate changes slowly: carried forward up to 30 s. Measured: the Strava phone app records it
                    # every 5 s; with the 3 s of power, 75 % of those activities' heart rate was being dropped
-ENRICH_VERSION = 2  # bump when the per-activity streams change, so they are read again
+ENRICH_VERSION = 4  # bump when the per-activity streams change, so they are read again (3: best power per duration;
+                    # 4: up to 60 min)
 
 
 @dataclass
@@ -81,8 +82,9 @@ def _per_second(samples: List[Tuple[datetime, Optional[float], Optional[float]]]
     return out
 
 
-def streams_from_file(row: dict, data_home: Path, recordings: Path) -> Tuple[Dict[int, int], Optional[float]]:
-    """(seconds at each heart rate, best 20 min power) of one activity, from its original file."""
+def streams_from_file(row: dict, data_home: Path, recordings: Path) -> Tuple[Dict[int, int], Dict[int, float]]:
+    """(seconds at each heart rate, best power of each duration of ftp_model.MMP_DURATIONS) of one activity,
+    from its original file."""
     samples = []
     name = row.get('file') or ''
     if row.get('source') == 'app':
@@ -103,9 +105,7 @@ def streams_from_file(row: dict, data_home: Path, recordings: Path) -> Tuple[Dic
     for hr, _ in grid:
         if hr:
             hist[int(round(hr))] = hist.get(int(round(hr)), 0) + 1
-    powers = [p for _, p in grid]
-    best20 = best_average(powers, 1200) if any(p is not None for p in powers) else None
-    return hist, best20
+    return hist, best_averages([p for _, p in grid])
 
 
 def enrich_missing(store, data_home: Path, recordings: Path) -> int:
@@ -114,14 +114,15 @@ def enrich_missing(store, data_home: Path, recordings: Path) -> int:
     for row in store.list(100000):
         if (row.get('enriched') or 0) >= ENRICH_VERSION:
             continue
-        hist, best20 = {}, None
+        hist, mmp = {}, {}
         if row.get('file'):
             try:
-                hist, best20 = streams_from_file(row, data_home, recordings)
+                hist, mmp = streams_from_file(row, data_home, recordings)
             except (OSError, FitError, ValueError, EOFError, KeyError):
                 pass   # a missing or broken file: the activity keeps its averages
         store.update(row['id'], {'hr_hist': json.dumps(hist, separators=(',', ':')) if hist else None,
-                                 'best20_w': best20, 'enriched': ENRICH_VERSION})
+                                 'best20_w': mmp.get(1200), 'mmp': json.dumps(mmp, separators=(',', ':')) if mmp else None,
+                                 'enriched': ENRICH_VERSION})
         done += 1
     return done
 

@@ -3,6 +3,7 @@ import { api } from '../api';
 import { clock, fmt } from '../format';
 import type { Telemetry, WorkoutLibrary } from '../types';
 import { Help } from '../components/Help';
+import { FtpNotice } from '../components/FtpNotice';
 import { WorkoutBlocks, ZoneLegend } from '../components/WorkoutBlocks';
 
 /**
@@ -15,9 +16,8 @@ export function Workouts({ data }: { data: Telemetry | null }) {
   const [busy, setBusy] = useState(false);
   const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
-  useEffect(() => {
-    api.workoutLibrary().then(setLibrary).catch((e) => setError(`No se pudo leer la biblioteca: ${message(e)}`));
-  }, []);
+  const loadLibrary = () => api.workoutLibrary().then(setLibrary).catch((e) => setError(`No se pudo leer la biblioteca: ${message(e)}`));
+  useEffect(() => { void loadLibrary(); }, []);
 
   const start = async (id: string) => {
     setBusy(true);
@@ -47,6 +47,7 @@ export function Workouts({ data }: { data: Telemetry | null }) {
       </div>
       {error && <div className="alert">{error}</div>}
       {blocked && library && <div className="notice">{blocked}</div>}
+      <FtpNotice always onChanged={() => void loadLibrary()} />
       <Help>
         <p>Sin ERG: la aplicación te enseña el objetivo de vatios de cada bloque y tú lo alcanzas con las marchas y la cadencia.
           Al empezar se inicia una sesión (si no había una) y vas al Panel. «Pausar» la sesión pausa también el entrenamiento.</p>

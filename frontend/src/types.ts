@@ -121,6 +121,19 @@ export type SessionWorkout = {
   best60sW?: number | null;
 };
 
+export type FtpEstimate = {
+  ftp: number; method: 'cp' | 'single'; seconds: number | null; cp: number | null; wPrime: number | null;
+  modelFtp: number | null; singleFtp: number | null;
+  efforts: { seconds: number; w: number; id: string; date: string; name: string | null }[];
+};
+export type FtpAdvice = {
+  ftp: number | null; kind: 'raise' | 'set' | 'test' | 'ok'; reason: 'above' | 'no_ftp' | 'no_max_effort' | 'falling' | 'ok';
+  suggestedFtp: number | null; estimateFtp: number | null; estimateFrom: 'indoor' | 'outdoor' | null;
+  indoor: FtpEstimate | null; outdoor: FtpEstimate | null;
+  lastMaxEffort: { date: string; name: string | null; daysAgo: number } | null; lastTest: { date: string } | null;
+  windowDays: number; maxEffortDays: number;
+};
+
 export type SessionSummary = {
   session: string;
   startedAtUtc: string;

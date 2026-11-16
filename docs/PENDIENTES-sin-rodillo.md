@@ -11,7 +11,7 @@ Lo que se puede hacer y probar sin el rodillo, en orden. Lo que necesita el rodi
 | 4 | **Exportar a FIT y validar las métricas** contra intervals.icu o GoldenCheetah (NP, TSS, desnivel) | FIT hecho y validado con las herramientas de Garmin; falta que compares en intervals.icu (`pruebas/VALIDAR-metricas-intervals.md`) |
 | 5 | **Test de FTP** (rampa o 20 min) como primer entrenamiento guiado | Hecho (15-11), probado en el simulador; el test de verdad, con el rodillo (prueba 6 de la otra lista) |
 | 6 | **Entrenamientos estructurados**: bloques con objetivo de vatios, primero sin ERG | Hecho (16-11): 7 entrenamientos para maratón de BTT, probado en el simulador; falta con el rodillo (prueba 7 de la otra lista) |
-| 6b | **Aviso de FTP**: estimarlo tras cada sesión con el modelo de potencia crítica y proponer subirlo o hacer el test, nunca cambiarlo solo (abajo) | Pendiente; antes de la 9 |
+| 6b | **Aviso de FTP**: estimarlo tras cada sesión con el modelo de potencia crítica y proponer subirlo o hacer el test, nunca cambiarlo solo (abajo) | Hecho (16-11): con tu historial, rodillo 152 W; sin potencia en la calle |
 | 7 | **Forma, fatiga y frescura** (CTL, ATL y TSB) con el historial de sesiones | Hecho (15-11), validado con el «Esfuerzo relativo» de Strava; mejora si pones tu pulso en reposo y tu umbral en el perfil |
 | 8 | **Método del desnivel acumulado de las rutas**: decidirlo con GPX reales frente al desnivel oficial | Hecho (15-11): media de 50 m, a menos del 1 % de Strava en tus 3 rutas (abajo) |
 | 9 | **Rutas generadas**: crear rutas a partir de distancia, desnivel, número de subidas… (abajo) | Pendiente |

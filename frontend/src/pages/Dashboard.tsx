@@ -6,6 +6,7 @@ import { ElevationProfile, GradeProfile, RouteProfile, TraceChart } from '../com
 import { GradePanel } from '../components/GradePanel';
 import { RampTestPanel } from '../components/RampTestPanel';
 import { WorkoutPanel } from '../components/WorkoutPanel';
+import { FtpNotice } from '../components/FtpNotice';
 import { GearPanel, Metrics, ReplayPlayer, SessionStats, StatusBar } from '../components/Panels';
 import { SessionBar } from '../components/SessionBar';
 
@@ -88,6 +89,7 @@ export function Dashboard({ data, error, history }: { data: Telemetry | null; er
       {shownError && <div className="alert">{shownError}</div>}
       <StatusBar data={data} />
       {!replay && <SessionBar data={data} onError={setActionError} />}
+      {idle && !data?.workoutType && sessionState === 'IDLE' && <FtpNotice />}
       <Metrics data={data} power3s={power3s} idle={idle} />
       {replay && <ReplayPlayer data={data} duration={duration} firstCommandAt={firstCommandAt} onError={setActionError} />}
       {data?.workoutType === 'STRUCTURED' && <WorkoutPanel data={data} power3s={power3s} onError={setActionError} />}

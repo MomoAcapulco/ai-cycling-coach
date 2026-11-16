@@ -270,6 +270,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == '/history/load' and self.admin is not None:
             self.respond(self.load_json())
             return
+        if path == '/history/ftp' and self.admin is not None:
+            self.respond(self.ftp_json())
+            return
         if path == '/sessions' and self.admin is not None:
             from coach.session.session import list_sessions
             self.respond({'sessions': list_sessions(self.admin.env.record_dir)})
@@ -325,6 +328,16 @@ class Handler(BaseHTTPRequestHandler):
         profile = self.admin.profile_store.load()[0] if self.admin.profile_store else RiderProfile()
         days = int((parse_qs(urlsplit(self.path).query).get('days') or ['180'])[0])
         return load_report(store.list(100000), profile, days=max(7, min(days, 3650)))
+
+    def ftp_json(self):
+        """The FTP estimated from recent hard efforts and what to do about it (coach/history/ftp_model.py)."""
+        from coach.app.rider_profile import RiderProfile
+        from coach.history.ftp_model import ftp_advice
+        from coach.history.load import enrich_missing
+        store = self.history_store()
+        enrich_missing(store, store.path.parent, self.admin.env.record_dir)
+        profile = self.admin.profile_store.load()[0] if self.admin.profile_store else RiderProfile()
+        return ftp_advice(profile, store.list(100000))
 
     def history_json(self, weeks: bool):
         """Every activity (this app's sessions are added on the fly), or totals per week (Monday to Sunday)."""
