@@ -142,7 +142,7 @@ class CsvReplay:
         self.duration = self.timeline[-1]
         self.offset = 0.0
         self.started = clock()
-        self.paused = False
+        self.paused = True        # waits at 0:00 for «Reproducir»: nothing plays until the rider asks
         self.speed = 1.0
         self.filename = path
 

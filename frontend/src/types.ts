@@ -213,6 +213,7 @@ export type RouteSummary = {
   minGradePercent?: number;
   clippedSteps?: number;
   points?: number;
+  thumb?: { d: number; e: number; g: number }[];
 };
 
 /** The route being ridden: summary plus the profile for the chart (d km, e m, g % of the next step). */

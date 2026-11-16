@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { api } from '../api';
 import { clock, fmt } from '../format';
 import type { Telemetry } from '../types';
+import { Help } from './Help';
 
 /**
  * Ramp FTP test without ERG: 5 min easy, then a target that rises every minute; the rider reaches it with the
@@ -32,10 +33,13 @@ export function RampTestPanel({ data, power3s, onError }: { data: Telemetry | nu
 
       {!phase && (
         <>
-          <p className="tiny">5 minutos suaves y después un objetivo que sube 20 W cada minuto, empezando en
-            {' '}{data?.workoutStartW ?? 'unos 100'} W. Lo alcanzas tú subiendo de marcha, y aguantas hasta que no puedas más: al dejar de
-            pedalear termina solo. Tu FTP es el 75 % de tu mejor minuto. Dura unos 15–25 minutos.</p>
-          <p className="tiny warn">Es un esfuerzo máximo. Hazlo descansado, y si notas mareo, dolor en el pecho o algo raro, para.</p>
+          <p className="tiny">Rampa hasta no poder más, 15–25 minutos: te da tu FTP.</p>
+          <Help>
+            <p>5 minutos suaves y después un objetivo que sube 20 W cada minuto, empezando en
+              {' '}{data?.workoutStartW ?? 'unos 100'} W. Lo alcanzas tú subiendo de marcha, y aguantas hasta que no puedas más: al dejar de
+              pedalear termina solo. Tu FTP es el 75 % de tu mejor minuto.</p>
+          </Help>
+          <p className="tiny warn">Esfuerzo máximo: hazlo descansado y para si notas mareo, dolor en el pecho o algo raro.</p>
           <button className="primary" disabled={busy} onClick={() => void run(() => api.startRampTest(), () => setSaved(null))}>Empezar test de FTP</button>
         </>
       )}

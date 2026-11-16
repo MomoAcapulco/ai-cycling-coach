@@ -4,6 +4,8 @@ import type { Sample } from '../types';
 type Field = 'power' | 'heart' | 'cadence' | 'speed';
 
 const W = 740;
+/** Labels at the edges grow inwards, so «0 min» and «10 min» are never cut. */
+const anchor = (x: number) => (x < 40 ? 'start' : x > W - 40 ? 'end' : 'middle');
 
 /** Line chart of one field over the whole session; the dashed line marks the current position. */
 export function TraceChart({ points, field, color, unit, current, duration, fullView }: {
@@ -35,7 +37,7 @@ export function TraceChart({ points, field, color, unit, current, duration, full
           <line key={f} x1={padX} x2={W - padX} y1={(H - axis) * f} y2={(H - axis) * f} stroke="#2c4745" strokeDasharray="4 6" />
         ))}
         {timeTicks(span).map(([t, label]) => (
-          <text key={t} x={x(t)} y={H - 2} fontSize="10" textAnchor="middle" fill="#7f9a94">{label}</text>
+          <text key={t} x={x(t)} y={H - 2} fontSize="10" textAnchor={anchor(x(t))} fill="#7f9a94">{label}</text>
         ))}
         <path d={d} fill="none" stroke={color} strokeWidth="2.3" strokeLinejoin="round" />
         <line x1={pointer} x2={pointer} y1="0" y2={H - axis} stroke="#e0e8d8" strokeWidth="1.5" strokeDasharray="5 4" />
@@ -109,7 +111,7 @@ export function GradeProfile({ points, current, duration, kind }: {
         {effective.length > 1 && <path d={line(effective, 'effective')} stroke="#f6c180" strokeWidth="1.4" strokeDasharray="5 4" fill="none" />}
         <line x1={marker} x2={marker} y1={top} y2={base} stroke="#f6c180" strokeWidth="2" strokeDasharray="5 4" />
         {timeTicks(span).map(([t, label]) => (
-          <text key={t} x={x(t)} y={base + 20} fontSize="11" textAnchor="middle" fill="#9eafa9">{label}</text>
+          <text key={t} x={x(t)} y={base + 20} fontSize="11" textAnchor={anchor(x(t))} fill="#9eafa9">{label}</text>
         ))}
       </svg>
       <div className="profile-legend">
@@ -181,7 +183,7 @@ export function ElevationProfile({ points, current, fullView }: { points: Sample
         <path d={drawn.map((r, i) => `${i ? 'L' : 'M'}${x(r.d).toFixed(1)},${y(r.a).toFixed(1)}`).join(' ')} stroke="#e8f1ee" strokeWidth="1.6" fill="none" />
         <line x1={x(now.d)} x2={x(now.d)} y1={top} y2={base} stroke="#f6c180" strokeWidth="2" strokeDasharray="5 4" />
         {kmTicks.map((k) => (
-          <text key={k} x={x(k)} y={base + 20} fontSize="11" textAnchor="middle" fill="#9eafa9">{fmt(k, kmStep < 1 ? 1 : 0)} km</text>
+          <text key={k} x={x(k)} y={base + 20} fontSize="11" textAnchor={anchor(x(k))} fill="#9eafa9">{fmt(k, kmStep < 1 ? 1 : 0)} km</text>
         ))}
       </svg>
       <div className="profile-legend">
@@ -226,7 +228,11 @@ export function RouteProfile({ profile, progressKm, title, compact = false }: {
           <text x={left - 8} y={y(e) + 4} textAnchor="end" fill="#94aaa5" fontSize="11">{fmt(e, 0)} m</text>
         </g>
       ))}
-      {profile.slice(1).map((p, i) => {
+      {compact && at == null && (   // a thumbnail: the shape only, in one colour (the grade colours, in the big one)
+        <path d={`M${x(0)},${base} ${profile.map((p) => `L${x(p.d).toFixed(1)},${y(p.e).toFixed(1)}`).join(' ')} L${x(total)},${base} Z`}
+          fill="#5fbf98" opacity=".28" />
+      )}
+      {!(compact && at == null) && profile.slice(1).map((p, i) => {
         const a = profile[i];
         const done = at != null && p.d <= at;
         return <path key={p.d} d={`M${x(a.d)},${base} L${x(a.d)},${y(a.e)} L${x(p.d)},${y(p.e)} L${x(p.d)},${base} Z`}
@@ -235,7 +241,7 @@ export function RouteProfile({ profile, progressKm, title, compact = false }: {
       <path d={profile.map((p, i) => `${i ? 'L' : 'M'}${x(p.d).toFixed(1)},${y(p.e).toFixed(1)}`).join(' ')} stroke="#e8f1ee" strokeWidth="1.4" fill="none" />
       {at != null && <line x1={x(at)} x2={x(at)} y1={top} y2={base} stroke="#f6c180" strokeWidth="2.5" />}
       {!compact && kmTicks.map((k) => (
-        <text key={k} x={x(k)} y={base + 20} fontSize="11" textAnchor="middle" fill="#9eafa9">{fmt(k, kmStep < 1 ? 1 : 0)} km</text>
+        <text key={k} x={x(k)} y={base + 20} fontSize="11" textAnchor={anchor(x(k))} fill="#9eafa9">{fmt(k, kmStep < 1 ? 1 : 0)} km</text>
       ))}
     </svg>
   );

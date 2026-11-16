@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import { fmt } from '../format';
 import type { Telemetry } from '../types';
+import { Help } from './Help';
 
 const MIN = -15;
 const MAX = 20;
@@ -86,7 +87,9 @@ export function GradePanel({ data, onError }: { data: Telemetry | null; onError:
       </div>
       <div className="gear-display">
         <span>Pedida</span>
-        <strong>{dragging != null ? fmt(dragging, 1) : pending != null ? fmt(pending, 1) : target == null ? '—' : fmt(target, 1)}<small> %</small></strong>
+        {dragging == null && pending == null && target == null
+          ? <strong className="grade-unset">llano · sin elegir</strong>
+          : <strong>{dragging != null ? fmt(dragging, 1) : pending != null ? fmt(pending, 1) : fmt(target, 1)}<small> %</small></strong>}
       </div>
       {onRoute && (
         <div className="notice">
@@ -122,13 +125,15 @@ export function GradePanel({ data, onError }: { data: Telemetry | null; onError:
         )}
       </div>
       {onTrainer && <p className="tiny">{GRADE_STATUS[data?.gradeStatus ?? ''] ?? data?.gradeStatus}</p>}
-      <p className="tiny">
+      <Help>
+      <p>
         Como en una carretera de verdad, la pendiente cambia según avanzas: 1 % cada {fmt(data?.gradeTransitionMetersPerPercent, 0)} m
         (parado no cambia). {onTrainer && `El rodillo aplica la dificultad ${data?.gradeDifficultyPercent ?? '—'} % (bajadas ×${data?.gradeDescentFactorPercent ?? '—'} %), entre ${pct(data?.gradeMinPercent)} y ${pct(data?.gradeMaxPercent)}.`} Se cambia en Ajustes → Perfil.
       </p>
       {onTrainer
-        ? <p className="tiny">«Aplicada ✓» es la pendiente que el rodillo confirma tener puesta (lo pregunta tras cada cambio).</p>
-        : <p className="tiny">En el simulador solo cambia la carretera virtual (velocidad, distancia, desnivel), para probarlo sin rodillo.</p>}
+        ? <p>«Aplicada ✓» es la pendiente que el rodillo confirma tener puesta (lo pregunta tras cada cambio).</p>
+        : <p>En el simulador solo cambia la carretera virtual (velocidad, distancia, desnivel), para probarlo sin rodillo.</p>}
+      </Help>
     </article>
   );
 }

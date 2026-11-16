@@ -67,6 +67,7 @@ export function History() {
   const [filter, setFilter] = useState<ActivityType | 'all'>('all');
   const [error, setError] = useState('');
   const [load, setLoad] = useState<LoadReport | null>(null);
+  const [limit, setLimit] = useState(30);
 
   useEffect(() => {
     Promise.all([api.history(), api.historyWeeks()])
@@ -107,7 +108,7 @@ export function History() {
         <table className="devices history-table">
           <thead><tr><th>Fecha</th><th>Tipo</th><th>Nombre</th><th>Tiempo</th><th>Distancia</th><th>Desnivel</th><th>Potencia (NP)</th><th>Pulso</th><th>Carga</th></tr></thead>
           <tbody>
-            {shown.map((a) => (
+            {shown.slice(0, limit).map((a) => (
               <tr key={a.id}>
                 <td>{date(a.start_utc)}</td>
                 <td><span className="swatch" style={{ background: TYPE_COLOR[a.type] }} /> {TYPE_LABEL[a.type]}</td>
@@ -125,6 +126,9 @@ export function History() {
           </tbody>
         </table>
         {activities && shown.length === 0 && <p className="muted">No hay actividades de este tipo.</p>}
+        {shown.length > limit && (
+          <div className="admin-actions"><button onClick={() => setLimit(limit + 50)}>Ver más ({shown.length - limit} restantes)</button></div>
+        )}
       </section>
     </div>
   );

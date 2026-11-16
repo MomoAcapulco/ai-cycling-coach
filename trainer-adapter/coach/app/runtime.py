@@ -258,6 +258,7 @@ class AdapterRuntime:
             from coach.session.session import SessionManager
             self.session = SessionManager(lambda state=state: current_reading(state), self.env.record_dir,
                                           ftp=self._ftp, capture=self._capture, rider_kg=self._rider_kg)
+            state.session_state = lambda session=self.session: session.state
         self.state = state  # one reference swap: HTTP handlers see the old or the new state, never a mix
         self.settings = settings
         self.source = source

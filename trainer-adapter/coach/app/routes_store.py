@@ -50,7 +50,8 @@ def list_routes(folder: Path):
     out = []
     for path in sorted(folder.glob('*.gpx'), key=lambda p: p.stat().st_mtime, reverse=True):
         try:
-            out.append({**load_route(folder, path.name).summary(), 'valid': True, 'error': None})
+            route = load_route(folder, path.name)
+            out.append({**route.summary(), 'valid': True, 'error': None, 'thumb': route.profile(max_points=80)})
         except (RouteError, OSError) as exc:
             out.append({'file': path.name, 'name': path.stem, 'valid': False, 'error': str(exc)[:200]})
     return out

@@ -8,7 +8,7 @@ from math import sin
 from threading import Lock, Thread
 from time import monotonic
 from types import SimpleNamespace
-from typing import Optional
+from typing import Callable, Optional
 from urllib.parse import parse_qs, urlsplit
 
 from coach.bluetooth.device_registry import DeviceRegistry
@@ -129,6 +129,9 @@ class AdapterState:
     ride: Optional[object] = None
     # coach.workouts.ramp_test.RampTest (the FTP test) while one is running or its result is shown.
     workout: Optional[object] = None
+    # The training session's state ('IDLE', 'RUNNING', 'PAUSED'); set by the runtime. In SIMULATOR the simulated
+    # rider only pedals while a session is RUNNING: nothing moves until the rider presses «Iniciar sesión».
+    session_state: Optional[Callable[[], str]] = None
 
     def __post_init__(self):
         if self.mode not in MODES:
@@ -151,6 +154,8 @@ def trainer_reading(state: 'AdapterState') -> dict:
     """The trainer (or simulator, or replay) alone, without HR, controllers or the virtual road."""
     if state.mode == 'SIMULATOR':
         reading = telemetry(monotonic() - state.started)
+        if state.session_state is not None and state.session_state() != 'RUNNING':
+            reading.update(powerWatts=0, cadenceRpm=0, speedKph=0.0)   # the simulated rider waits, sat on the bike
         workout = state.workout
         if workout is not None and workout.phase in ('WARMUP', 'RAMP'):
             # a simulated rider for trying the FTP test without a trainer: easy warm-up, follows the target up

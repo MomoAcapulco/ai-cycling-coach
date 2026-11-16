@@ -90,3 +90,26 @@ a.button-link:hover{background:#2b4f46}
 .weeks-chart{display:block;width:100%;height:180px}.history-table td{white-space:nowrap}.history-table td:nth-child(3){white-space:normal}
 .ramp-target{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:14px 0}.ramp-target div{border:1px solid #284541;border-radius:12px;padding:12px}.ramp-target span{display:block;font-size:11px;color:#91a8a4}.ramp-target strong{font-size:40px;font-variant-numeric:tabular-nums}.ramp-target .ok strong{color:#7fe7b0}.ramp-target .off strong{color:#f3b77f}
 .load-chart{display:block;width:100%;height:200px}
+.grade-unset{font-size:20px!important;color:#91a8a4;letter-spacing:0!important}
+.session-card .admin-actions button{font-size:13px;padding:10px 13px}
+/* v4.3: calmer pages — smaller titles, explanations folded */
+h1{font-size:clamp(24px,2.6vw,32px);letter-spacing:-.025em;margin:4px 0 8px}
+.heading,.admin .heading{margin:26px 0 16px}
+.timer strong{font-size:34px}
+.help{margin:10px 0 2px;font-size:12px}
+.help summary{cursor:pointer;color:#81d8b2;list-style:none;width:fit-content}
+.help summary::-webkit-details-marker{display:none}
+.help summary::before{content:'ⓘ ';}
+.help>div{color:#9cb3ad;line-height:1.5;margin-top:6px}.help p{margin:0 0 6px}
+.empty-state{display:flex;flex-direction:column;justify-content:center;min-height:220px;text-align:center;align-items:center}
+.empty-state h2{margin:0 0 6px}
+.session-card .admin-actions{margin-bottom:0}
+.session-card .button-link,.session-card .admin-actions button{font-size:13px;padding:9px 13px;line-height:1.2}
+.more-menu{position:relative}
+.more-menu summary{list-style:none;cursor:pointer;display:inline-block}.more-menu summary::-webkit-details-marker{display:none}
+.more-menu>div{position:absolute;z-index:5;top:calc(100% + 6px);left:0;min-width:230px;background:#132c2e;border:1px solid #446259;border-radius:10px;padding:6px;display:flex;flex-direction:column}
+.more-menu>div a{color:#e8f9f1;text-decoration:none;font-size:13px;padding:8px 10px;border-radius:7px}.more-menu>div a:hover{background:#1d3937}
+.gear-bars{display:flex;align-items:end;gap:10px;margin:6px 0 12px}
+.gear-bars>div{display:grid;grid-template-columns:repeat(24,1fr);gap:2px;align-items:end;height:34px;width:min(360px,60%)}
+.gear-bars i{display:block;background:#81d8b2;border-radius:2px 2px 0 0}
+a.button-link.primary{background:#267659;border-color:#63d5a1;color:#fff;font-weight:700}

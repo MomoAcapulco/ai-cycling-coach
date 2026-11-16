@@ -75,6 +75,18 @@ Historial de versiones (lo que antes estaba en un README por versión). La más 
   - Al iniciar una sesión nueva, las gráficas, el perfil del recorrido y la pendiente máxima **empiezan de cero**, con el tiempo de la sesión. Antes arrastraban todo lo anterior. Al terminar, la última sesión se queda en pantalla hasta empezar otra.
   - Botones ±0,5 % de la pendiente: varias pulsaciones seguidas solo contaban una por segundo, porque cada pulsación sumaba a la última lectura de telemetría y el botón se bloqueaba mientras se enviaba. Ahora cada pulsación suma al instante y se envía una sola vez, 0,3 s después de la última, con el total. El deslizador no tenía el problema.
   - Pulsómetro: si no se ve la banda, el Panel ya dice qué comprobar (que esté puesta y humedecida, y que no esté conectada a un reloj, al móvil o a Zwift) y la terminal lo escribe una vez. Antes solo ponía «WAITING».
+- **Repaso visual de la interfaz** (capturas del 16-11):
+  - Panel: barra de estado en español (Conectado, Buscando…) con el motivo en un ⓘ; no muestra el pulsómetro ni los mandos si están desactivados. Sin sesión no aparecen las estadísticas vacías. La tarjeta de pendiente ya no va resaltada y dice «llano · sin elegir» hasta que eliges una.
+  - Gráficas: el perfil de altitud solo sale si hay desnivel (≥ 2 m), la de pendiente solo si cambia, y la de pulso solo si hay pulsómetro.
+  - Rutas: cada ruta lleva una miniatura de su perfil (`thumb` en `GET /routes`) y un botón «Perfil grande / Perfil pequeño». La nota de las bajadas sale una vez arriba, no en cada ruta.
+  - Sesiones: las de prueba (menos de 1 minuto o sin trabajo) se ocultan tras «Mostrar N sesiones de prueba». IF y TSS usan el FTP estimado del historial cuando el perfil no tiene FTP, igual que la página Historial. Botones del mismo tamaño.
+  - Historial: la tabla muestra 30 actividades y «Ver más» (antes, las 122 seguidas).
+  - **Nada se mueve sin pedirlo**: el ciclista simulado solo pedalea con una sesión en marcha (antes pedaleaba siempre y parecía que había una sesión), y un replay espera en 0:00 a «Reproducir». Sin sesión, el Panel deja los números vacíos y en vez de gráficas dice «Sin sesión»; tras «Terminar» se quedan las gráficas de la última sesión.
+  - Menos texto: las explicaciones (marchas, pendiente, test de FTP, rutas, perfil, dispositivos) van plegadas en «ⓘ ¿Cómo funciona?». Títulos más pequeños.
+  - Las etiquetas de los ejes ya no se cortan en los bordes («0 min», «10 min»).
+  - Rutas: miniatura de un solo color (los colores por pendiente, en el perfil grande); sin el nombre del fichero.
+  - Sesiones: «Ver en replay» y «Descargar FIT» a la vista, el resto de descargas en «Más ▾»; el tiempo por marcha es una minigráfica de barras; «FTP estimado» pasa a «FTP de esta sesión».
+  - Ajustes: el perfil del ciclista va primero; identificadores Bluetooth abreviados (el completo al pasar el ratón); «Volver a .env» pasa a «Restaurar valores por defecto» (no toca el perfil).
 - **Forma, fatiga y frescura** (`coach/history/load.py`, sección en Historial):
   - Carga de cada actividad en unidades TSS:
     - **con potencia** (bici, si hay FTP): horas × IF² × 100;

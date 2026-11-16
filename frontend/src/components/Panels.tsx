@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { api } from '../api';
 import { clock, fmt } from '../format';
 import type { Sample, Telemetry } from '../types';
+import { Help } from './Help';
 
 const MODE_LABEL: Record<string, string> = { SIMULATOR: 'SIMULADOR', WAHOO: 'RODILLO REAL', REPLAY: 'REPLAY · HISTÓRICO' };
 
@@ -35,28 +36,50 @@ const CHOOSE = <a href="#/ajustes">elige cuál en Ajustes</a>;
 const reason = (text?: string | null) =>
   text ? text.replace(/^(HR BLE|BLE): [A-Za-z]+Error: /, '').replace(/^(HR BLE|BLE): /, '') : '';
 
+/** Device states in plain Spanish (the adapter sends technical codes). */
+const STATE: Record<string, string> = {
+  STREAMING: 'recibiendo', WAITING: 'esperando', STALE: 'sin datos recientes', SEARCHING: 'buscando',
+  CONNECTED: 'conectado', DISCONNECTED: 'desconectado', NOT_FOUND: 'no encontrado', DISABLED: 'desactivado',
+  REPLAY: 'replay', REPLAY_FINISHED: 'replay terminado',
+};
+const state = (code?: string | null) => (code ? STATE[code] ?? code.toLowerCase() : 'esperando');
+
+/** One device: a coloured dot, its name and state; the reason, when there is one, only on hover. */
+function Device({ ok, label, value, why }: { ok?: boolean; label: string; value: React.ReactNode; why?: string }) {
+  return <span className={ok ? 'ok' : 'off'} title={why || undefined}>● {label}: {value}{why ? ' ⓘ' : ''}</span>;
+}
+
 export function StatusBar({ data }: { data: Telemetry | null }) {
+  const hrWhy = data?.heartRateConnected ? '' : reason(data?.heartRateError);
   return (
     <div className="statuses">
-      <span className={data?.connected ? 'ok' : 'off'}>● Telemetría: {mustChoose(data?.error) ? <>varios rodillos cerca, {CHOOSE}</> : data?.status ?? 'Esperando'}</span>
-      <span className={data?.heartRateConnected ? 'ok' : 'off'}>● Pulso: {mustChoose(data?.heartRateError) ? <>varias bandas cerca, {CHOOSE}</>
-        : data?.heartRateConnected || data?.heartRateStatus === 'DISABLED' ? data?.heartRateStatus
-          : <>{data?.heartRateStatus ?? 'Esperando'}{reason(data?.heartRateError) && ` · ${reason(data?.heartRateError)}`}</>}</span>
-      <span className={data?.zwiftLeftConnected ? 'ok' : 'off'}>
-        ● Mando izq.: {mustChoose(data?.zwiftLeftStatus) ? CHOOSE : data?.zwiftLeftStatus ?? 'Sin datos'}{battery(data?.zwiftLeftBatteryPercent)}
-      </span>
-      <span className={data?.zwiftRightConnected ? 'ok' : 'off'}>
-        ● Mando der.: {mustChoose(data?.zwiftRightStatus) ? CHOOSE : data?.zwiftRightStatus ?? 'Sin datos'}{battery(data?.zwiftRightBatteryPercent)}
-      </span>
+      <Device ok={data?.connected} label="Rodillo" why={data?.connected ? '' : reason(data?.error)}
+        value={mustChoose(data?.error) ? <>varios cerca, {CHOOSE}</> : state(data?.status)} />
+      {data?.heartRateStatus !== 'DISABLED' && (
+        <Device ok={data?.heartRateConnected} label="Pulso" why={hrWhy}
+          value={mustChoose(data?.heartRateError) ? <>varias bandas cerca, {CHOOSE}</>
+            : data?.heartRateConnected ? `${fmt(data?.heartRateBpm)} ppm` : hrWhy.startsWith('no se ve') ? 'no se ve la banda' : state(data?.heartRateStatus)} />
+      )}
+      {data?.zwiftLeftStatus !== 'DISABLED' && (
+        <Device ok={data?.zwiftLeftConnected} label="Mando izq."
+          value={<>{mustChoose(data?.zwiftLeftStatus) ? CHOOSE : state(data?.zwiftLeftStatus)}{battery(data?.zwiftLeftBatteryPercent)}</>} />
+      )}
+      {data?.zwiftRightStatus !== 'DISABLED' && (
+        <Device ok={data?.zwiftRightConnected} label="Mando der."
+          value={<>{mustChoose(data?.zwiftRightStatus) ? CHOOSE : state(data?.zwiftRightStatus)}{battery(data?.zwiftRightBatteryPercent)}</>} />
+      )}
     </div>
   );
 }
 
-export function Metrics({ data, power3s }: { data: Telemetry | null; power3s: number | null }) {
+/** The six big numbers. ``idle`` (no session, no replay): all empty, nothing was asked for. */
+export function Metrics({ data: live, power3s, idle = false }: { data: Telemetry | null; power3s: number | null; idle?: boolean }) {
+  const data = idle ? null : live;
+  const note = (text: string) => (idle ? '' : text);
   const road = data?.roadGradePercent ?? null;
   const target = data?.targetGradePercent ?? null;
   const onTrainer = data?.gradeControlMode === 'TRAINER';
-  const hasRoad = road != null;
+  const hasRoad = road != null || idle;
   const grade = hasRoad ? road : target;
   const gradeNote = !hasRoad
     ? (grade == null ? 'Sin orden en esta fase' : 'Pendiente ordenada (registro antiguo)')
@@ -66,12 +89,12 @@ export function Metrics({ data, power3s }: { data: Telemetry | null; power3s: nu
   const gain = data?.sessionElevationGainM ?? data?.elevationGainM;
   return (
     <section className="metrics">
-      <article className="metric emphasis"><span>POTENCIA</span><div><strong>{fmt(data?.powerWatts)}</strong><em>W</em></div><small>Media 3 s: {fmt(power3s)} W{data?.wattsPerKg != null ? ` · ${fmt(data.wattsPerKg, 2)} W/kg` : ''}</small></article>
-      <article className="metric"><span>PULSO</span><div><strong>{fmt(data?.heartRateBpm)}</strong><em>ppm</em></div><small>Banda de pulso</small></article>
-      <article className="metric"><span>CADENCIA</span><div><strong>{fmt(data?.cadenceRpm)}</strong><em>rpm</em></div><small>Revoluciones/min</small></article>
-      <article className="metric"><span>VELOCIDAD</span><div><strong>{fmt(speed, 1)}</strong><em>km/h</em></div><small>{data?.rideSpeedKph != null ? `En la carretera virtual · rodillo ${fmt(data?.speedKph, 1)} km/h` : 'Velocidad del rodillo'}</small></article>
-      <article className="metric slope-metric"><span>{hasRoad ? 'PENDIENTE' : 'PENDIENTE ORDENADA'}</span><div><strong>{fmt(grade, 1)}</strong><em>%</em></div><small>{gradeNote}</small></article>
-      <article className="metric"><span>DESNIVEL</span><div><strong>{fmt(gain, 0)}</strong><em>m</em></div><small>{data?.altitudeM != null ? `VAM ${fmt(data?.vamMh, 0)} m/h · ${data?.sessionElevationGainM != null ? 'en la sesión' : 'desde que arrancó'}` : 'Sin carretera virtual'}</small></article>
+      <article className="metric emphasis"><span>POTENCIA</span><div><strong>{fmt(data?.powerWatts)}</strong><em>W</em></div><small>{idle ? 'Empieza al iniciar la sesión' : `Media 3 s: ${fmt(power3s)} W${data?.wattsPerKg != null ? ` · ${fmt(data.wattsPerKg, 2)} W/kg` : ''}`}</small></article>
+      <article className="metric"><span>PULSO</span><div><strong>{fmt(data?.heartRateBpm)}</strong><em>ppm</em></div><small>{note('Banda de pulso')}</small></article>
+      <article className="metric"><span>CADENCIA</span><div><strong>{fmt(data?.cadenceRpm)}</strong><em>rpm</em></div><small>{note('Revoluciones/min')}</small></article>
+      <article className="metric"><span>VELOCIDAD</span><div><strong>{fmt(speed, 1)}</strong><em>km/h</em></div><small>{note(data?.rideSpeedKph != null ? `En la carretera virtual · rodillo ${fmt(data?.speedKph, 1)} km/h` : 'Velocidad del rodillo')}</small></article>
+      <article className="metric"><span>{hasRoad ? 'PENDIENTE' : 'PENDIENTE ORDENADA'}</span><div><strong>{fmt(grade, 1)}</strong><em>%</em></div><small>{note(gradeNote)}</small></article>
+      <article className="metric"><span>DESNIVEL</span><div><strong>{fmt(gain, 0)}</strong><em>m</em></div><small>{note(data?.altitudeM != null ? `VAM ${fmt(data?.vamMh, 0)} m/h` : 'Sin carretera virtual')}</small></article>
     </section>
   );
 }
@@ -174,27 +197,30 @@ export function GearPanel({ data, replay, onError }: { data: Telemetry | null; r
           <p className="tiny">{GEAR_STATUS[data?.gearStatus ?? ''] ?? data?.gearStatus}
             {data?.trainerGearRatio ? ` · relación ${fmt(data.trainerGearRatio, 2)}` : ''}</p>
           {data?.gearLastRefusal && <p className="tiny warn">Se rechazó endurecer: sin pedalear (o sin datos del rodillo) la marcha no sube.</p>}
-          <p className="tiny">Mandos: «+» derecho endurece, «−» izquierdo suaviza. Al salir, el rodillo vuelve a la marcha 12.</p>
         </>
-      ) : (
-        <>
-          <p className="tiny">Relación relativa: {fmt(data?.virtualGearRelativeRatio, 2)}× (tabla de 24 marchas de Zwift).</p>
-          <p className="tiny">{replay ? 'En replay las marchas son solo visuales.' : 'Para que muevan el rodillo, activa el control de marchas en Ajustes (modo rodillo real).'}</p>
-        </>
-      )}
-      <p className="tiny">Último botón: {data?.lastButton ?? 'ninguno'}</p>
+      ) : null}
+      <Help>
+        {onTrainer
+          ? <p>Mandos: «+» derecho endurece, «−» izquierdo suaviza. Al salir, el rodillo vuelve a la marcha 12.</p>
+          : <p>Relación relativa: {fmt(data?.virtualGearRelativeRatio, 2)}× (tabla de 24 marchas de Zwift).
+            {' '}{replay ? 'En replay las marchas son solo visuales.' : 'Para que muevan el rodillo, activa el control de marchas en Ajustes (modo rodillo real).'}</p>}
+        <p>Último botón: {data?.lastButton ?? 'ninguno'}</p>
+      </Help>
     </article>
   );
 }
 
 export function SessionStats({ data, points }: { data: Telemetry | null; points: Sample[] }) {
   const maxGrade = points.reduce<number | null>((a, p) => (p.grade == null ? a : Math.max(a ?? p.grade, p.grade)), null);
+  const inSession = data?.sessionState === 'RUNNING' || data?.sessionState === 'PAUSED';
+  const replay = data?.source === 'REPLAY';
+  if (!inSession && !replay) return null;   // without a session these would be totals since the app started: confusing
   return (
     <article className="panel stats">
-      <h2>Sesión</h2>
-      <div><span>Distancia</span><strong>{fmt(data?.sessionDistanceKm ?? data?.estimatedDistanceKm ?? data?.rideDistanceKm, 2)} km</strong></div>
-      <div><span>Desnivel acumulado</span><strong>{fmt(data?.sessionElevationGainM ?? data?.elevationGainM, 0)} m</strong></div>
-      <div><span>Trabajo mecánico</span><strong>{fmt(data?.sessionWorkKj ?? data?.mechanicalWorkKj, 1)} kJ</strong></div>
+      <h2>{replay ? 'Sesión grabada' : 'Esta sesión'}</h2>
+      <div><span>Distancia</span><strong>{fmt(replay ? data?.estimatedDistanceKm : data?.sessionDistanceKm, 2)} km</strong></div>
+      <div><span>Desnivel acumulado</span><strong>{fmt(replay ? null : data?.sessionElevationGainM, 0)} m</strong></div>
+      <div><span>Trabajo mecánico</span><strong>{fmt(replay ? data?.mechanicalWorkKj : data?.sessionWorkKj, 1)} kJ</strong></div>
       <div><span>Pendiente máxima</span><strong>{fmt(maxGrade, 1)} %</strong></div>
       <div><span>Fuente</span><strong>{data?.source ?? '—'}</strong></div>
     </article>

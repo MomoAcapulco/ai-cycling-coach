@@ -28,6 +28,8 @@ frontend/.vite/
 trainer-adapter/recordings/
 # Output of the diagnostic tools (scans of everything around, trainer inventory, test runs).
 diagnostics/
+# Screenshots of the app (they show the rider's data)
+screens/
 
 # tests/fixtures DOES go in: a few recorded packets the tests need, with every device identifier, serial and name
 # masked by scripts/mask_personal_data.py. Run it (with --check) before committing new recordings.

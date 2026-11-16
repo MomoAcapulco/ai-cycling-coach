@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
 import type { DeviceRole, DevicesState, RememberedDevice } from '../types';
+import { Help } from './Help';
+
+/** A Bluetooth id is long: the end is enough to tell them apart; the whole one on hover. */
+const shortId = (id: string) => (id.length > 14 ? `…${id.slice(-8)}` : id);
 
 const ROLES: DeviceRole[] = ['trainer', 'heart_rate', 'zwift_left', 'zwift_right'];
 const ROLE_LABEL: Record<DeviceRole, string> = {
@@ -44,12 +48,14 @@ export function DevicesSection({ initial }: { initial: DevicesState | null }) {
     <section className="panel">
       <div className="panel-heading"><h2>Dispositivos</h2><span>AUTODESCUBRIMIENTO</span></div>
       {error && <div className="alert">{error}</div>}
-      <p className="tiny">
+      <Help>
+      <p>
         Se encuentran por su tipo (lo que anuncian por Bluetooth), de cualquier marca, y se recuerdan todos los que has
         usado ({devices?.registryFile ?? '—'}). Al conectar se usa el preferido si está
         cerca; si no, el último que usaste. Si hay varios desconocidos y ninguno conocido, no se elige al azar: aparecen
         aquí para que elijas. El pulsómetro y los mandos cambian al momento; el rodillo, en la siguiente conexión.
       </p>
+      </Help>
       {ROLES.map((role) => {
         const known = devices?.known?.[role] ?? [];
         const pending = devices?.pending?.[role] ?? [];
@@ -65,7 +71,7 @@ export function DevicesSection({ initial }: { initial: DevicesState | null }) {
                   {pending.map((c) => (
                     <tr key={c.address}>
                       <td>{c.name ?? 'sin nombre'}</td><td className="tiny">{signal(c.rssi)}</td>
-                      <td className="mono">{c.address}</td>
+                      <td className="mono" title={c.address}>{shortId(c.address)}</td>
                       <td><button className="primary" disabled={busy} onClick={() => use(role, c)}>Este es el mío</button></td>
                     </tr>
                   ))}
@@ -82,7 +88,7 @@ export function DevicesSection({ initial }: { initial: DevicesState | null }) {
                       <td>{d.name ?? '—'} {d.preferred ? <span className="live-tag">PREFERIDO</span> : i === 0 ? <span className="tiny">(se usa primero)</span> : null}</td>
                       <td>{d.zwiftModel ?? d.kind}</td>
                       <td>{when(d.lastUsedAtUtc)}</td>
-                      <td className="mono">{d.address}</td>
+                      <td className="mono" title={d.address}>{shortId(d.address)}</td>
                       <td className="device-actions">
                         {!d.preferred && <button disabled={busy} onClick={() => use(role, d)}>Usar este</button>}
                         <button disabled={busy} onClick={() => forget(role, d)}>Olvidar</button>

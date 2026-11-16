@@ -3,6 +3,7 @@ import { api } from '../api';
 import { fmt } from '../format';
 import { RouteProfile } from '../components/Charts';
 import type { ActiveRoute, RouteSummary, Telemetry } from '../types';
+import { Help } from '../components/Help';
 
 type Listing = { routes: RouteSummary[]; folder: string; current: string | null; available: boolean };
 
@@ -68,9 +69,7 @@ export function Routes({ data }: { data: Telemetry | null }) {
         <div>
           <p className="eyebrow">RUTAS</p>
           <h1>Rueda un recorrido real</h1>
-          <p className="muted">Sube el GPX de una carrera o de una subida. La pendiente seguirá su perfil según avanzas,
-            con la misma transición suave de siempre. Los GPX se guardan en tu carpeta de datos ({listing?.folder ?? '—'}),
-            fuera del repositorio.</p>
+          <p className="muted">Sube el GPX de una carrera o de una subida: la pendiente seguirá su perfil según avanzas.</p>
         </div>
       </div>
       {error && <div className="alert">{error}</div>}
@@ -84,6 +83,11 @@ export function Routes({ data }: { data: Telemetry | null }) {
         <button className="primary" disabled={busy} onClick={() => fileInput.current?.click()}>Subir GPX</button>
         {current && <button disabled={busy} onClick={() => void leave()}>Salir de la ruta actual</button>}
       </div>
+      <Help>
+        <p>La pendiente cambia con la misma transición suave de siempre. Las bajadas de más del −5 % se notan en el rodillo como tu
+          límite de bajada (Ajustes → Perfil): el rodillo no puede empujarte cuesta abajo. Sí cuentan para la velocidad y la distancia.</p>
+        <p>Los GPX se guardan en tu carpeta de datos, fuera del repositorio: {listing?.folder ?? '—'}</p>
+      </Help>
       {listing && listing.routes.length === 0 && <p className="muted">Todavía no hay rutas. Sube un GPX (con altitud).</p>}
       {listing?.routes.map((r) => {
         const active = profiles[r.file];
@@ -91,7 +95,7 @@ export function Routes({ data }: { data: Telemetry | null }) {
           <article className="panel session-card" key={r.file}>
             <div className="panel-heading">
               <h2>{r.name}</h2>
-              <span>{r.file === current ? 'RODANDO AHORA' : r.file}</span>
+              {r.file === current && <span className="live-tag">RODANDO AHORA</span>}
             </div>
             {r.valid ? (
               <>
@@ -103,14 +107,15 @@ export function Routes({ data }: { data: Telemetry | null }) {
                 </div>
                 {active?.active && r.file === current
                   ? <RouteProfile profile={active.profile} progressKm={data?.routeProgressKm ?? active.progressKm} compact />
-                  : previews[r.file] && <RouteProfile profile={previews[r.file]} progressKm={null} compact />}
+                  : previews[r.file]
+                    ? <RouteProfile profile={previews[r.file]} progressKm={null} />
+                    : r.thumb && <RouteProfile profile={r.thumb} progressKm={null} compact />}
                 {!!r.clippedSteps && <p className="tiny warn">El GPX tiene {r.clippedSteps} tramos de 5 m con más de ±30 %, casi seguro errores de altitud del GPX: se han recortado a ±30 %.</p>}
-                {(r.minGradePercent ?? 0) < -5 && <p className="tiny">Las bajadas de más del −5 % se notan en el rodillo como tu límite de bajada (Ajustes → Perfil): el rodillo no puede empujarte cuesta abajo. Sí cuentan para la velocidad y la distancia.</p>}
                 <div className="admin-actions">
                   <button className="primary" disabled={busy || !listing.available || r.file === current} onClick={() => void ride(r)}>
                     {r.file === current ? 'Rodando' : 'Rodar esta ruta'}
                   </button>
-                  {r.file !== current && <button disabled={busy} onClick={() => void preview(r)}>{previews[r.file] ? 'Ocultar perfil' : 'Ver perfil'}</button>}
+                  {r.file !== current && <button disabled={busy} onClick={() => void preview(r)}>{previews[r.file] ? 'Perfil pequeño' : 'Perfil grande'}</button>}
                 </div>
               </>
             ) : <p className="tiny warn">No se puede usar: {r.error}</p>}

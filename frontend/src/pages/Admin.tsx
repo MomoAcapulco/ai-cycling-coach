@@ -4,6 +4,7 @@ import { bytes, clock } from '../format';
 import type { AdminState, DevicesState, Mode, Recording, Settings } from '../types';
 import { DevicesSection } from '../components/DevicesSection';
 import { ProfileSection } from '../components/ProfileSection';
+import { Help } from '../components/Help';
 
 const MODES: { mode: Mode; title: string; text: string }[] = [
   { mode: 'WAHOO', title: 'Rodillo real', text: 'Lee el rodillo por Bluetooth. Sin órdenes de resistencia.' },
@@ -70,16 +71,16 @@ export function Admin() {
   };
 
   const reset = async () => {
-    if (!window.confirm('¿Volver a los valores del fichero .env? Se borran los ajustes guardados desde esta página.')) return;
+    if (!window.confirm('¿Restaurar los valores por defecto (fichero .env)? Se borran la fuente de datos y los sensores guardados desde esta página; tu perfil no cambia.')) return;
     setBusy(true);
     try {
       const result = await api.resetSettings();
       setAdmin(result);
       setDraft(result.settings);
       setError('');
-      setNotice('Se usan otra vez los valores de .env.');
+      setNotice('Valores por defecto restaurados.');
     } catch (e) {
-      setError(`No se pudo volver a .env: ${message(e)}`);
+      setError(`No se pudieron restaurar los valores por defecto: ${message(e)}`);
     } finally {
       setBusy(false);
     }
@@ -109,10 +110,8 @@ export function Admin() {
       <div className="heading">
         <div>
           <p className="eyebrow">AJUSTES</p>
-          <h1>Fuente de datos y dispositivos</h1>
-          <p className="muted">
-            Los cambios se aplican al momento, sin reiniciar. Origen actual: {admin.source === 'saved' ? 'guardado desde esta página' : 'fichero .env'}.
-          </p>
+          <h1>Tu perfil, la fuente de datos y los dispositivos</h1>
+          <p className="muted">Los cambios se aplican al momento, sin reiniciar.</p>
         </div>
       </div>
 
@@ -124,8 +123,10 @@ export function Admin() {
         </div>
       )}
 
+      <ProfileSection />
+
       <section className="panel">
-        <div className="panel-heading"><h2>Fuente de datos</h2><span>ACTUAL: {current.mode}</span></div>
+        <div className="panel-heading"><h2>Fuente de datos</h2><span>ACTUAL: {MODES.find((m) => m.mode === current.mode)?.title.toUpperCase() ?? current.mode}</span></div>
         <div className="mode-cards" role="radiogroup" aria-label="Fuente de datos">
           {MODES.map(({ mode, title, text }) => (
             <button key={mode} role="radio" aria-checked={draft.mode === mode} disabled={locked}
@@ -171,7 +172,7 @@ export function Admin() {
         </label>
         <label className="switch">
           <input type="checkbox" checked={draft.zwiftEnabled} disabled={locked} onChange={(e) => set({ zwiftEnabled: e.target.checked })} />
-          <span>Mandos Zwift (se buscan solos; solo cambian la marcha visual)</span>
+          <span>Mandos Zwift (se buscan solos)</span>
         </label>
       </section>
 
@@ -183,11 +184,11 @@ export function Admin() {
               onChange={(e) => set({ gearControlEnabled: e.target.checked })} />
             <span>Las marchas (mandos y botones del panel) cambian la resistencia del rodillo</span>
           </label>
-          <p className="tiny">
+          <Help><p>
             24 marchas de Zwift, empieza en la 12. Cada cambio lo confirma el rodillo; sin pedalear no se endurece;
             al salir vuelve a la 12. La pendiente no cambia. Usa los pesos del perfil del ciclista.
-            {draft.gearControlEnabled && !draft.zwiftEnabled ? ' Activa también los mandos Zwift para cambiar con ellos.' : ''}
-          </p>
+          </p></Help>
+          {draft.gearControlEnabled && !draft.zwiftEnabled && <p className="tiny warn">Activa también los mandos Zwift para cambiar con ellos.</p>}
         </section>
       )}
 
@@ -207,11 +208,10 @@ export function Admin() {
           {busy ? 'Aplicando…' : 'Aplicar'}
         </button>
         <button disabled={busy || !dirty} onClick={() => setDraft(current)}>Descartar cambios</button>
-        <button disabled={busy || admin.source !== 'saved' || locked} onClick={() => void reset()}>Volver a .env</button>
+        <button disabled={busy || admin.source !== 'saved' || locked} onClick={() => void reset()}
+          title="Los valores del fichero .env de la instalación">Restaurar valores por defecto</button>
         {!replayReady && <span className="tiny">Elige una grabación válida para el replay.</span>}
       </div>
-
-      <ProfileSection />
 
       <DevicesSection initial={devices} />
     </div>

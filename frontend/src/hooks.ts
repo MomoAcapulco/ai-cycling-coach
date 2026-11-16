@@ -10,9 +10,9 @@ const LIVE_HISTORY = 3600; // one hour of 1 Hz samples
  * Polls /telemetry every second. On errors it backs off (1, 2, 4, 8 s) instead of hammering a
  * stopped adapter, and recovers by itself. Live (non-replay) samples are kept as history.
  *
- * During a training session the history is THE SESSION: it starts empty at «Iniciar sesión» and its time axis is
- * the session time (pauses excluded). Without a session it shows the free riding since the adapter started. The
- * last session stays on screen after «Terminar» until a new one starts.
+ * The history is THE SESSION: it starts empty at «Iniciar sesión» and its time axis is the session time (pauses
+ * excluded). Without a session nothing is recorded (nothing was asked for). The last session stays on screen after
+ * «Terminar» until a new one starts.
  */
 export function useTelemetry() {
   const [data, setData] = useState<Telemetry | null>(null);
@@ -42,10 +42,9 @@ export function useTelemetry() {
           setHistory([]);                     // a new session: its charts start empty, at 0:00
         }
         if (inSession) lastSession.current = d.session ?? null;   // after «Terminar» it remembers the last one
-        const idleAfterSession = !inSession && !!lastSession.current;  // keep the finished session on screen
-        if (d.source !== 'REPLAY' && d.connected && !idleAfterSession) {
+        if (d.source !== 'REPLAY' && d.connected && d.sessionState === 'RUNNING') {
           const sample: Sample = {
-            t: inSession ? Math.round(d.sessionElapsedSeconds ?? 0) : d.elapsedSeconds, power: d.powerWatts, heart: d.heartRateBpm, cadence: d.cadenceRpm,
+            t: Math.round(d.sessionElapsedSeconds ?? 0), power: d.powerWatts, heart: d.heartRateBpm, cadence: d.cadenceRpm,
             speed: d.rideSpeedKph ?? d.speedKph, grade: d.roadGradePercent ?? d.targetGradePercent ?? null,
             effective: d.effectiveGradePercent ?? null, distance: d.rideDistanceKm ?? null, altitude: d.altitudeM ?? null,
           };
