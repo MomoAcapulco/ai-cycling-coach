@@ -132,6 +132,8 @@ class AdapterState:
     # The training session's state ('IDLE', 'RUNNING', 'PAUSED'); set by the runtime. In SIMULATOR the simulated
     # rider only pedals while a session is RUNNING: nothing moves until the rider presses «Iniciar sesión».
     session_state: Optional[Callable[[], str]] = None
+    # (FTP, source) of the rider: the profile's or the estimated one (AdapterRuntime.workout_ftp); for the zones.
+    rider_ftp: Optional[Callable[[], tuple]] = None
 
     def __post_init__(self):
         if self.mode not in MODES:
@@ -195,6 +197,8 @@ def current_reading(state: 'AdapterState') -> dict:
         reading.update(state.grade.snapshot())  # gradeControlMode TRAINER, effective/sent grade
     if state.workout is not None:
         reading.update(state.workout.snapshot())  # the workout: phase, target, block / step, results
+    if state.rider_ftp is not None:
+        reading['ftpW'], reading['ftpSource'] = state.rider_ftp()
     reading['mode'] = state.mode
     return reading
 
@@ -461,6 +465,10 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if path == '/admin/settings/reset' and self.admin is not None:
                 self.respond(self.admin.reset_to_env())
+                return
+            if path == '/routes/generate' and self.admin is not None:
+                from coach.app.routes_store import generate
+                self.respond(generate(self.admin.env.routes_dir, self.read_json()))
                 return
             if path == '/routes' and self.admin is not None:
                 from coach.app.routes_store import MAX_UPLOAD_BYTES as MAX_GPX, save_upload as save_route

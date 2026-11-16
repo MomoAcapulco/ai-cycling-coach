@@ -24,6 +24,7 @@ from coach.devices.zwift_controllers import controller_worker
 
 STOP_TIMEOUT_SECONDS = 8
 RIDE_TICK_SECONDS = 0.25
+FTP_CACHE_S = 300          # the FTP estimated from the history, when the profile has none: read every 5 min at most
 
 
 def workout_ticker(state, test, stop, tick=1.0):
@@ -156,6 +157,7 @@ class AdapterRuntime:
 
     def profile_changed(self, profile):
         """The rider saved the profile: the grade difficulty and limits apply without restarting."""
+        self._ftp_estimate = None
         state = self.state
         if state is not None and state.ride is not None:
             state.ride.set_profile(profile.rider_weight_kg, profile.bike_weight_kg,
@@ -186,10 +188,20 @@ class AdapterRuntime:
         return workout.snapshot()
 
     def workout_ftp(self):
-        """(FTP, source) for the workout targets: the profile's, else the one estimated from the history."""
+        """(FTP, source): the profile's, else the one estimated from the history (coach/history/load.derive_params,
+        the same for the training load, the workouts and the zones). The estimate is kept FTP_CACHE_S seconds."""
         ftp = self._ftp()
         if ftp:
             return ftp, 'profile'
+        from time import monotonic
+        cached = getattr(self, '_ftp_estimate', None)
+        if cached is not None and monotonic() - cached[0] < FTP_CACHE_S:
+            return cached[1]
+        result = self._estimate_ftp()
+        self._ftp_estimate = (monotonic(), result)
+        return result
+
+    def _estimate_ftp(self):
         try:
             from coach.history.load import derive_params
             from coach.history.store import HistoryStore
@@ -311,6 +323,7 @@ class AdapterRuntime:
                                           ftp=self._ftp, capture=self._capture, rider_kg=self._rider_kg,
                                           extra=self.workout_summary)
             state.session_state = lambda session=self.session: session.state
+        state.rider_ftp = self.workout_ftp
         self.state = state  # one reference swap: HTTP handlers see the old or the new state, never a mix
         self.settings = settings
         self.source = source

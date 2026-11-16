@@ -8,7 +8,9 @@ Load of one activity, in TSS units so that everything adds up on one scale:
 - **hr_avg**: the same with the average heart rate when there is no per-second file.
 - **estimate**: neither power nor heart rate: hours × a typical load per hour of the activity type (rides 50,
   runs 60, strength 35, other 40). Rough on purpose, and marked as such.
-Thresholds: from the rider profile; if missing, FTP = 95 % of the best 20 min power of the last year, max heart
+Thresholds: from the rider profile; if missing, FTP = the estimate from the efforts of the last 8 weeks
+(coach/history/ftp_model.estimated_ftp, the same one of the FTP notice, the workouts and the zones), or without
+recent efforts 95 % of the best 20 min power of the last year; max heart
 rate = the highest of the activities (but a lone spike more than 8 bpm above the next is ignored), resting heart
 rate 60, threshold heart rate = 90 % of the max. Every value says where it came from.
 
@@ -141,6 +143,9 @@ def robust_max(values: List[float]) -> Optional[int]:
 def derive_params(profile, rows: List[dict], today: Optional[date] = None) -> Params:
     today = today or datetime.now().astimezone().date()
     ftp, ftp_source = getattr(profile, 'ftp_watts', None), 'profile'
+    if not ftp:
+        from coach.history.ftp_model import estimated_ftp
+        ftp, ftp_source = estimated_ftp(rows, today), 'history'
     if not ftp:
         year_ago = (today - timedelta(days=365)).isoformat()
         best = [r['best20_w'] for r in rows if r.get('best20_w') and r['type'] in CYCLING

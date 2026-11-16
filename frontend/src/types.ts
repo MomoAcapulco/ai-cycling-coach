@@ -43,6 +43,8 @@ export type Telemetry = {
   vamMh?: number | null;
   wattsPerKg?: number | null;
   gradeTransitionMetersPerPercent?: number;
+  ftpW?: number | null;           // the profile's FTP, or the one estimated from the history
+  ftpSource?: 'profile' | 'history' | null;
   workoutType?: 'RAMP_TEST' | 'STRUCTURED';
   workoutPhase?: 'WARMUP' | 'RAMP' | 'RUNNING' | 'DONE' | 'ABORTED';
   workoutId?: string;
@@ -120,6 +122,8 @@ export type SessionWorkout = {
   completedPct?: number; workCompliancePct?: number | null; workInRangePct?: number | null; blocks?: BlockResult[];
   best60sW?: number | null;
 };
+
+export type GeneratedRoute = RouteSummary & { seed: number; profile: { d: number; e: number; g: number }[]; saved: boolean };
 
 export type FtpEstimate = {
   ftp: number; method: 'cp' | 'single'; seconds: number | null; cp: number | null; wPrime: number | null;

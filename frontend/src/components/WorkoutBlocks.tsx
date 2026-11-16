@@ -1,16 +1,9 @@
 import { clock, fmt } from '../format';
 import type { WorkoutBlock } from '../types';
+import { POWER_ZONES } from '../zones';
 
-/** Colour of a target by its training zone (% of FTP), the usual Coggan zones. */
-export const ZONES: [number, string, string][] = [
-  [0, '#7c8f9c', 'Recuperación (< 56 %)'],
-  [56, '#7fb6ff', 'Resistencia (56–75 %)'],
-  [76, '#6ce8af', 'Tempo (76–87 %)'],
-  [88, '#e9d27a', 'Sweet spot (88–94 %)'],
-  [95, '#f2a65a', 'Umbral (95–105 %)'],
-  [106, '#ef7b6b', 'VO2 máx (> 105 %)'],
-];
-export const zoneColor = (pct: number) => [...ZONES].reverse().find(([from]) => pct >= from)?.[1] ?? '#7c8f9c';
+/** Colour of a target by its power zone (Coggan, the same as the Panel's zone). */
+export const zoneColor = (pct: number) => [...POWER_ZONES].reverse().find(([from]) => pct >= from)?.[3] ?? POWER_ZONES[0][3];
 
 /**
  * The workout as blocks: width = duration, height = target (% of FTP), colour = zone; ramps are slanted. With
@@ -46,7 +39,9 @@ export function WorkoutBlocks({ blocks, position = null, height = 70 }: { blocks
 export function ZoneLegend() {
   return (
     <div className="profile-legend">
-      {ZONES.map(([from, color, label]) => <span key={from}><span className="swatch" style={{ background: color }} /> {label}</span>)}
+      {POWER_ZONES.slice(0, 6).map(([from, short, name, color], i) => (
+        <span key={short}><span className="swatch" style={{ background: color }} /> {short} {name} ({i < 5 ? `${from}–${POWER_ZONES[i + 1][0] - 1}` : `> ${from - 1}`} %)</span>
+      ))}
       <span>┄ 100 % del FTP</span>
     </div>
   );

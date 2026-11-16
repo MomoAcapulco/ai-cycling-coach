@@ -133,6 +133,7 @@ class ApiTests(unittest.TestCase):
 
     def test_needs_an_ftp(self):
         self.assertIsNone(self.call('/workout/library', method='GET')['ftpW'])
+        self.assertIsNone(self.call('/telemetry', method='GET')['ftpW'])          # no FTP: no zone
         with self.assertRaises(HTTPError) as ctx:
             self.call('/workout/structured/start', {'id': 'sweetspot-3x12'})
         self.assertEqual(ctx.exception.code, 409)
@@ -145,6 +146,8 @@ class ApiTests(unittest.TestCase):
         self.profiles.update({'ftpWatts': 200})
         library = self.call('/workout/library', method='GET')
         self.assertEqual((library['ftpW'], library['ftpSource']), (200, 'profile'))
+        telemetry = self.call('/telemetry', method='GET')                          # for the zone in the Panel
+        self.assertEqual((telemetry['ftpW'], telemetry['ftpSource']), (200, 'profile'))
         self.assertEqual(next(w for w in library['workouts'] if w['id'] == 'sweetspot-3x12')['blocks'][1]['startW'], 180)
         started = self.call('/workout/structured/start', {'id': 'sweetspot-3x12'})
         self.assertEqual((started['workoutType'], started['workoutName'], started['targetPowerW']),

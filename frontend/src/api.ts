@@ -1,4 +1,4 @@
-import type { ActiveRoute, Activity, HistoryWeek, LoadReport, RouteSummary, WorkoutLibrary, FtpAdvice } from './types';
+import type { ActiveRoute, Activity, HistoryWeek, LoadReport, RouteSummary, WorkoutLibrary, FtpAdvice, GeneratedRoute } from './types';
 import type { AdminState, DevicesState, ProfileState, Recording, RiderProfile, Session, SessionSummary, Settings, Telemetry } from './types';
 
 const BASE = '/api/trainer';
@@ -89,6 +89,7 @@ export const api = {
       method: 'POST', headers: { 'Content-Type': 'application/gpx+xml' }, body: file,
     }),
   route: () => request<ActiveRoute>('/route'),
+  generateRoute: (body: object) => request<GeneratedRoute>('/routes/generate', json(body)),
   routePreview: (file: string) =>
     request<RouteSummary & { profile: { d: number; e: number; g: number }[] }>(`/routes/${encodeURIComponent(file)}`),
   startRoute: (file: string) => request<RouteSummary>('/route/start', json({ file })),

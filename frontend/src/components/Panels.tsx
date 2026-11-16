@@ -4,6 +4,7 @@ import { clock, fmt } from '../format';
 import type { Sample, Telemetry } from '../types';
 import { Help } from './Help';
 import type { Route } from '../hooks';
+import { POWER_ZONES, powerZone } from '../zones';
 
 const MODE_LABEL: Record<string, string> = { SIMULATOR: 'SIMULADOR', WAHOO: 'RODILLO REAL', REPLAY: 'REPLAY · HISTÓRICO' };
 
@@ -88,10 +89,22 @@ export function Metrics({ data: live, power3s, idle = false }: { data: Telemetry
     : target == null ? 'Llano: elige una pendiente en el panel'
       : `Pedida ${fmt(target, 1)} %${onTrainer ? ` · rodillo ${fmt(data?.gradeConfirmed ? data?.appliedGradePercent : data?.effectiveGradePercent, 1)} %${data?.gradeConfirmed ? ' ✓' : ''}` : ''}`;
   const speed = data?.rideSpeedKph ?? data?.speedKph;
+  // the zone of the 3 s power (the instant one jumps with every pedal stroke)
+  const zone = powerZone(power3s, data?.ftpW);
+  const zoneIndex = zone ? POWER_ZONES.findIndex(([, short]) => short === zone.short) : -1;
   const gain = data?.sessionElevationGainM ?? data?.elevationGainM;
   return (
     <section className="metrics">
-      <article className="metric emphasis"><span>POTENCIA</span><div><strong>{fmt(data?.powerWatts)}</strong><em>W</em></div><small>{idle ? 'Empieza al iniciar la sesión' : `Media 3 s: ${fmt(power3s)} W${data?.wattsPerKg != null ? ` · ${fmt(data.wattsPerKg, 2)} W/kg` : ''}`}</small></article>
+      <article className="metric emphasis" style={zone ? { borderColor: zone.color } : undefined}>
+        <span>POTENCIA</span><div><strong>{fmt(data?.powerWatts)}</strong><em>W</em></div>
+        {zone && (
+          <div className="zone-line" title={`${zone.name}: ${zone.from}${zone.to != null ? `–${zone.to}` : '+'} % de tu FTP (${data?.ftpW} W${data?.ftpSource === 'history' ? ', estimado' : ''})`}>
+            <b style={{ background: zone.color }}>{zone.short}</b> {zone.name} · {fmt(zone.pct, 0)} % FTP
+            <span className="zone-bar">{POWER_ZONES.map(([, short, , color], i) => <i key={short} style={{ background: color, opacity: i === zoneIndex ? 1 : 0.22 }} />)}</span>
+          </div>
+        )}
+        <small>{idle ? 'Empieza al iniciar la sesión' : `Media 3 s: ${fmt(power3s)} W${data?.wattsPerKg != null ? ` · ${fmt(data.wattsPerKg, 2)} W/kg` : ''}${!data?.ftpW ? ' · zona: sin FTP' : ''}`}</small>
+      </article>
       <article className="metric"><span>PULSO</span><div><strong>{fmt(data?.heartRateBpm)}</strong><em>ppm</em></div><small>{note('Banda de pulso')}</small></article>
       <article className="metric"><span>CADENCIA</span><div><strong>{fmt(data?.cadenceRpm)}</strong><em>rpm</em></div><small>{note('Revoluciones/min')}</small></article>
       <article className="metric"><span>VELOCIDAD</span><div><strong>{fmt(speed, 1)}</strong><em>km/h</em></div><small>{note(data?.rideSpeedKph != null ? `En la carretera virtual · rodillo ${fmt(data?.speedKph, 1)} km/h` : 'Velocidad del rodillo')}</small></article>

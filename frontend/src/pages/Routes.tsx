@@ -4,6 +4,7 @@ import { fmt } from '../format';
 import { RouteProfile } from '../components/Charts';
 import type { ActiveRoute, RouteSummary, Telemetry } from '../types';
 import { Help } from '../components/Help';
+import { RouteGenerator } from '../components/RouteGenerator';
 
 type Listing = { routes: RouteSummary[]; folder: string; current: string | null; available: boolean };
 
@@ -69,7 +70,7 @@ export function Routes({ data }: { data: Telemetry | null }) {
         <div>
           <p className="eyebrow">RUTAS</p>
           <h1>Rueda un recorrido real</h1>
-          <p className="muted">Sube el GPX de una carrera o de una subida: la pendiente seguirá su perfil según avanzas.</p>
+          <p className="muted">Sube el GPX de una carrera o de una subida, o genera una: la pendiente seguirá su perfil según avanzas.</p>
         </div>
       </div>
       {error && <div className="alert">{error}</div>}
@@ -88,6 +89,8 @@ export function Routes({ data }: { data: Telemetry | null }) {
           límite de bajada (Ajustes → Perfil): el rodillo no puede empujarte cuesta abajo. Sí cuentan para la velocidad y la distancia.</p>
         <p>Los GPX se guardan en tu carpeta de datos, fuera del repositorio: {listing?.folder ?? '—'}</p>
       </Help>
+      {listing && <RouteGenerator races={listing.routes.filter((r) => r.valid && !r.file.startsWith('generada_') && !r.file.startsWith('como_'))}
+        onSaved={() => { setNotice('Ruta generada guardada: está la primera de la lista.'); void load(); }} />}
       {listing && listing.routes.length === 0 && <p className="muted">Todavía no hay rutas. Sube un GPX (con altitud).</p>}
       {listing?.routes.map((r) => {
         const active = profiles[r.file];

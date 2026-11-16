@@ -57,6 +57,36 @@ def list_routes(folder: Path):
     return out
 
 
+def generate(folder: Path, body: dict) -> dict:
+    """A generated route (coach/session/route_generator.py): previewed, or saved as a GPX with ``save``.
+
+    ``mode`` «custom» takes distanceKm, gainM, climbs, avgGrade, maxGrade, kicks, descentGrade; «like» takes the
+    ``file`` of a race and distanceKm. ``seed`` repeats a route: the preview returns it, the save sends it back.
+    """
+    from coach.session.route_generator import generate_custom, generate_like
+    if not isinstance(body, dict):
+        raise ValueError('Expected an object')
+    mode, seed = body.get('mode'), body.get('seed')
+    if mode == 'custom':
+        route, data, seed = generate_custom(body, seed)
+        km, gain = body['distanceKm'], body['gainM']
+        filename = f'generada_{km:.0f}km_{gain:.0f}m_s{seed}.gpx'
+    elif mode == 'like':
+        try:
+            race = load_route(folder, body.get('file'))
+        except FileNotFoundError:
+            raise ValueError('file must be one of your routes')
+        route, data, seed = generate_like(race, body.get('distanceKm'), seed)
+        filename = f'como_{Path(race.file).stem}_{body["distanceKm"]:.0f}km_s{seed}.gpx'
+    else:
+        raise ValueError('mode must be custom or like')
+    out = {**route.summary(), 'seed': seed, 'profile': route.profile(600), 'saved': False}
+    if body.get('save'):
+        saved = save_upload(folder, filename, data)
+        out.update(file=saved['file'], saved=True)
+    return out
+
+
 def save_upload(folder: Path, name: str, data: bytes) -> dict:
     """Validate an uploaded GPX as a ridable route and store it without overwriting anything."""
     if not data:

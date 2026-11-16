@@ -14,7 +14,7 @@ Lo que se puede hacer y probar sin el rodillo, en orden. Lo que necesita el rodi
 | 6b | **Aviso de FTP**: estimarlo tras cada sesión con el modelo de potencia crítica y proponer subirlo o hacer el test, nunca cambiarlo solo (abajo) | Hecho (16-11): con tu historial, rodillo 152 W; sin potencia en la calle |
 | 7 | **Forma, fatiga y frescura** (CTL, ATL y TSB) con el historial de sesiones | Hecho (15-11), validado con el «Esfuerzo relativo» de Strava; mejora si pones tu pulso en reposo y tu umbral en el perfil |
 | 8 | **Método del desnivel acumulado de las rutas**: decidirlo con GPX reales frente al desnivel oficial | Hecho (15-11): media de 50 m, a menos del 1 % de Strava en tus 3 rutas (abajo) |
-| 9 | **Rutas generadas**: crear rutas a partir de distancia, desnivel, número de subidas… (abajo) | Pendiente |
+| 9 | **Rutas generadas**: crear rutas a partir de distancia, desnivel, número de subidas… (abajo) | Hecho (16-11): «a medida» y «como mi carrera», probado con tus 5 GPX; falta rodar una con el rodillo |
 | 10 | **Lo que necesita la IA además de 4–7**: tu objetivo y calendario, tus salidas en la calle, cómo te sientes, historial consultable, reglas y privacidad (abajo) | **10a hecha (15-11)**: historial + importación de Strava (118 actividades). Faltan objetivo y calendario, sensaciones, reglas |
 | 11 | **IA, fase 1: análisis después de cada sesión** | Tras la 4, la 5 y parte de la 10 |
 | 12 | **IA, fase 2: planificación** (semana, ajustes según cómo vas, puesta a punto para la carrera) | Tras la 6, la 7 y la 10 |
@@ -102,6 +102,9 @@ corregidos con mapas de elevación, casi sin ruido). Para decidir:
 3. Comparo los cuatro métodos con ellos y elegimos el que más se acerque.
 
 ## 9. Rutas generadas
+
+**Hecho (16-11)**, en la página Rutas (`coach/session/route_generator.py`). Lo que sigue es el planteamiento
+original; lo hecho está en el CHANGELOG.
 
 Crear una ruta sin GPX, a partir de lo que quieres entrenar. Se guarda y se rueda como cualquier ruta subida.
 

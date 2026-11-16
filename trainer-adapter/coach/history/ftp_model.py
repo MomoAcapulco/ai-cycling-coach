@@ -140,6 +140,17 @@ def is_max_effort(row: dict, ftp: int) -> bool:
     return long >= 0.95 * ftp or mmp.get(300, 0) >= 1.15 * ftp
 
 
+def estimated_ftp(rows: List[dict], today: Optional[date] = None) -> Optional[int]:
+    """The FTP for the trainer estimated from recent efforts (indoor, else outdoor × OUTDOOR_TO_INDOOR), or None.
+    The one used everywhere when the profile has no FTP (training load, workouts, zones)."""
+    today = today or datetime.now().astimezone().date()
+    indoor = estimate(rows, INDOOR, today)
+    if indoor:
+        return indoor['ftp']
+    outdoor = estimate(rows, OUTDOOR, today)
+    return int(round(outdoor['ftp'] * OUTDOOR_TO_INDOOR)) if outdoor else None
+
+
 def ftp_advice(profile, rows: List[dict], today: Optional[date] = None) -> dict:
     today = today or datetime.now().astimezone().date()
     ftp = getattr(profile, 'ftp_watts', None)
