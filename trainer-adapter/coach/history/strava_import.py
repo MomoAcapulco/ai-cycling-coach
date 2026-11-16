@@ -70,6 +70,7 @@ class Columns:
         self.avg_hr = first('Frecuencia cardiaca promedio', 'Average Heart Rate')
         self.avg_power = first('Vatios promedio', 'Average Watts')
         self.relative_effort = first('Esfuerzo Relativo', 'Relative Effort')
+        self.perceived = first('Esfuerzo percibido', 'Perceived Exertion')       # 1–10, when the rider set it
         if None in (self.id, self.date, self.type):
             raise ValueError('activities.csv lacks the id, date or type column: not a Strava export?')
 
@@ -100,6 +101,7 @@ def import_strava_zip(zip_path: Path, store: HistoryStore) -> dict:
                     'avg_hr': _number(row[cols.avg_hr]) if cols.avg_hr is not None else None,
                     'avg_power': _number(row[cols.avg_power]) if cols.avg_power is not None else None,
                     'strava_relative_effort': _number(row[cols.relative_effort]) if cols.relative_effort is not None else None,
+                    'rpe': _number(row[cols.perceived]) if cols.perceived is not None and cols.perceived < len(row) else None,
                     'has_power': int((_number(row[cols.avg_power]) or 0) > 0) if cols.avg_power is not None else 0,
                     'has_hr': int((_number(row[cols.avg_hr]) or 0) > 0) if cols.avg_hr is not None else 0}
             name = row[cols.file] if cols.file is not None else ''

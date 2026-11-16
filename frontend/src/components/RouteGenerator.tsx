@@ -23,17 +23,21 @@ export function RouteGenerator({ races, onSaved }: { races: RouteSummary[]; onSa
   const [race, setRace] = useState(races[0]?.file ?? '');
   const [likeKm, setLikeKm] = useState(40);
   const [preview, setPreview] = useState<GeneratedRoute | null>(null);
+  const [name, setName] = useState('');               // proposed with each preview; the rider can change it
+  const [nameEdited, setNameEdited] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const raceFile = race || races[0]?.file || '';
   const body = (seed?: number, save = false) => (mode === 'custom'
-    ? { mode, ...custom, seed, save } : { mode, file: raceFile, distanceKm: likeKm, seed, save });
+    ? { mode, ...custom, seed, save, name: save ? name : undefined }
+    : { mode, file: raceFile, distanceKm: likeKm, seed, save, name: save ? name : undefined });
   const run = async (seed?: number, save = false) => {
     setBusy(true);
     try {
       const r = await api.generateRoute(body(seed, save));
       setError('');
-      if (save) { setPreview(null); onSaved(); } else setPreview(r);
+      if (save) { setPreview(null); setNameEdited(false); onSaved(); }
+      else { setPreview(r); if (!nameEdited) setName(r.name); }
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); setPreview(null); }
     finally { setBusy(false); }
   };
@@ -41,7 +45,16 @@ export function RouteGenerator({ races, onSaved }: { races: RouteSummary[]; onSa
 
   return (
     <section className="panel route-generator">
-      <div className="panel-heading"><h2>Generar una ruta</h2><span>A MEDIDA O COMO TU CARRERA</span></div>
+      <div className="panel-heading"><h2>Generar una ruta <Help title="Cómo se generan las rutas">
+        {mode === 'custom'
+          ? <p>Cada subida va por tramos de unos 300 m cuya pendiente cambia poco a poco alrededor de la media, con una rampa a la
+            pendiente máxima. Los repechos son golpes cortos (150–400 m) entre las subidas. Entre medias, llanos con ondulaciones
+            suaves. El desnivel se ajusta al que pides, medido igual que en esta página.</p>
+          : <p>Usa las subidas de verdad de la carrera (con su pendiente metro a metro) y la bajada que va después de cada una, en el
+            mismo orden, eligiendo las que mantienen los metros de desnivel por km. La subida más dura siempre entra. El resto, llanos.</p>}
+        <p>El recorrido es una línea inventada: en el rodillo solo cuentan la distancia y el desnivel. Cada variante tiene un número
+          (semilla): la misma semilla da la misma ruta.</p>
+      </Help></h2><span>A MEDIDA O COMO TU CARRERA</span></div>
       <div className="display-mode">
         <div>
           <button className={mode === 'custom' ? 'selected' : ''} onClick={() => { setMode('custom'); setPreview(null); }}>A medida</button>
@@ -71,20 +84,16 @@ export function RouteGenerator({ races, onSaved }: { races: RouteSummary[]; onSa
             ({fmt((chosen.elevationGainM ?? 0) / (chosen.distanceKm || 1), 0)} m/km). En {likeKm} km saldrían unos {fmt((chosen.elevationGainM ?? 0) / (chosen.distanceKm || 1) * likeKm, 0)} m.</p>}
         </div>
       )}
-      <Help>
-        {mode === 'custom'
-          ? <p>Cada subida va por tramos de unos 300 m cuya pendiente cambia poco a poco alrededor de la media, con una rampa a la
-            pendiente máxima. Los repechos son golpes cortos (150–400 m) entre las subidas. Entre medias, llanos con ondulaciones
-            suaves. El desnivel se ajusta al que pides, medido igual que en esta página.</p>
-          : <p>Usa las subidas de verdad de la carrera (con su pendiente metro a metro) y la bajada que va después de cada una, en el
-            mismo orden, eligiendo las que mantienen los metros de desnivel por km. La subida más dura siempre entra. El resto, llanos.</p>}
-        <p>El recorrido es una línea inventada: en el rodillo solo cuentan la distancia y el desnivel. Cada variante tiene un número
-          (semilla): la misma semilla da la misma ruta.</p>
-      </Help>
       {error && <div className="alert">{error}</div>}
       <div className="admin-actions">
         <button className="primary" disabled={busy || (mode === 'like' && !raceFile)} onClick={() => void run()}>{busy ? 'Generando…' : preview ? 'Otra variante' : 'Vista previa'}</button>
-        {preview && <button className="primary" disabled={busy} onClick={() => void run(preview.seed, true)}>Guardar esta ruta</button>}
+        {preview && (
+          <>
+            <input className="route-name" maxLength={80} value={name} aria-label="Nombre de la ruta" placeholder={preview.name}
+              onChange={(e) => { setName(e.target.value); setNameEdited(true); }} />
+            <button className="primary" disabled={busy} onClick={() => void run(preview.seed, true)}>Guardar con este nombre</button>
+          </>
+        )}
       </div>
       {preview && (
         <>

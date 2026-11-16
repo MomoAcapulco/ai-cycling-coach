@@ -66,6 +66,8 @@ class Route:
     loss_m: float = 0.0
     clipped_steps: int = 0
     source_points: int = 0
+    gpx_name: str = ''                            # the name inside the GPX; ``name`` may be the rider's own
+    timed_points: int = 0                         # points with a <time>: a recorded ride, which can be replayed
 
     def grade_at(self, distance_m: float) -> Optional[float]:
         """Grade at ``distance_m`` from the start; None after the end."""
@@ -95,9 +97,9 @@ class Route:
 
 
 def _read_points(data: bytes):
-    """(name, [(lat, lon, ele)]): the track points, or the route points if there is no track."""
+    """(name, [(lat, lon, ele)], points with a time): the track points, or the route points if there is no track."""
     import io
-    name, track, route, root_checked = None, [], [], False
+    name, track, route, root_checked, timed = None, [], [], False, 0
     try:
         for event, element in ET.iterparse(io.BytesIO(data), events=('start', 'end')):
             tag = _local(element.tag)
@@ -111,6 +113,7 @@ def _read_points(data: bytes):
                 name = element.text.strip()[:120]
             elif tag in ('trkpt', 'rtept'):
                 ele = next((c.text for c in element if _local(c.tag) == 'ele'), None)
+                timed += any(_local(c.tag) == 'time' for c in element)
                 try:
                     lat, lon = float(element.get('lat')), float(element.get('lon'))
                     elevation = float(ele) if ele is not None else None
@@ -126,7 +129,7 @@ def _read_points(data: bytes):
                 element.clear()   # free the point and its children (time, hr, extensions…)
     except ET.ParseError as exc:
         raise RouteError(f'Not valid XML: {exc}')
-    return name, track or route
+    return name, track or route, timed
 
 
 def _local(tag: str) -> str:
@@ -143,7 +146,7 @@ def haversine_m(lat1, lon1, lat2, lon2) -> float:
 def parse_gpx(data: bytes, file: str = 'route.gpx') -> Route:
     if re.search(rb'<!(DOCTYPE|ENTITY)', data[:4096] + data[-4096:], re.I) or re.search(rb'<!ENTITY', data, re.I):
         raise RouteError('GPX files with DOCTYPE/ENTITY declarations are not accepted')
-    name, points = _read_points(data)
+    name, points, timed = _read_points(data)
     if len(points) < 2:
         raise RouteError('The GPX has fewer than 2 points with elevation')
 
@@ -164,7 +167,8 @@ def parse_gpx(data: bytes, file: str = 'route.gpx') -> Route:
             grade = min(high, max(low, grade))
         grades.append(grade)
     rises = [b - a for a, b in zip(elevations, elevations[1:])]
-    return Route(file=file, name=name or file.rsplit('.', 1)[0], distance_m=total, elevations=elevations,
+    name = name or file.rsplit('.', 1)[0]
+    return Route(file=file, name=name, gpx_name=name, timed_points=timed, distance_m=total, elevations=elevations,
                  grades=grades, gain_m=sum(r for r in rises if r > 0), loss_m=-sum(r for r in rises if r < 0),
                  clipped_steps=clipped, source_points=len(points))
 

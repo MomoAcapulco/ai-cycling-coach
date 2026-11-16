@@ -110,12 +110,31 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(self.call('/routes')['routes'], [])                     # a preview saves nothing
         saved = self.call('/routes/generate', {'mode': 'custom', **BASE, 'seed': preview['seed'], 'save': True})
         self.assertEqual((saved['saved'], saved['elevationGainM']), (True, preview['elevationGainM']))
-        self.assertEqual(saved['file'], f'generada_60km_1200m_s{preview["seed"]}.gpx')
+        self.assertEqual((preview['name'], saved['file']), ('60 km · 1200 m+ · 5 subidas', 'gen_60_km_1200_m_5_subidas.gpx'))
         again = self.call('/routes/generate', {'mode': 'custom', **BASE, 'seed': preview['seed'], 'save': True})
         self.assertNotEqual(again['file'], saved['file'])                        # never overwrites
-        like = self.call('/routes/generate', {'mode': 'like', 'file': saved['file'], 'distanceKm': 30, 'save': True})
-        self.assertTrue(like['file'].startswith('como_generada_60km'))
-        self.assertEqual(len(self.call('/routes')['routes']), 3)
+        like = self.call('/routes/generate', {'mode': 'like', 'file': saved['file'], 'distanceKm': 30, 'save': True,
+                                               'name': '  Cuna   de la Legión, corta '})
+        self.assertEqual((like['name'], like['file']), ('Cuna de la Legión, corta', 'gen_Cuna_de_la_Legion_corta.gpx'))
+        routes = self.call('/routes')['routes']
+        self.assertEqual(len(routes), 3)
+        self.assertTrue(all(r['generated'] for r in routes))
+
+    def test_rename_any_route_without_touching_its_gpx(self):
+        saved = self.call('/routes/generate', {'mode': 'custom', **BASE, 'save': True})
+        gpx = (self.folder / 'routes' / saved['file']).read_bytes()
+        renamed = self.call('/routes/rename', {'file': saved['file'], 'name': 'Mi ruta de sábado'})
+        self.assertEqual(renamed['name'], 'Mi ruta de sábado')
+        [listed] = self.call('/routes')['routes']
+        self.assertEqual((listed['name'], listed['gpxName']), ('Mi ruta de sábado', saved['name']))
+        self.assertEqual((self.folder / 'routes' / saved['file']).read_bytes(), gpx)     # the GPX is not rewritten
+        self.assertEqual(self.call('/routes/rename', {'file': saved['file'], 'name': ''})['name'], saved['name'])
+        with self.assertRaises(HTTPError) as ctx:
+            self.call('/routes/rename', {'file': 'nope.gpx', 'name': 'x'})
+        self.assertEqual(ctx.exception.code, 404)
+        with self.assertRaises(HTTPError) as ctx:
+            self.call('/routes/rename', {'file': saved['file'], 'name': 'x' * 81})
+        self.assertEqual(ctx.exception.code, 400)
 
     def test_errors_are_explained(self):
         for body in ({'mode': 'custom', **BASE, 'distanceKm': 20, 'gainM': 2000, 'avgGrade': 5},

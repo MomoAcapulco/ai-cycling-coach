@@ -3,6 +3,7 @@ import { api } from '../api';
 import { clock, fmt } from '../format';
 import type { Activity, ActivityType, HistoryWeek, LoadReport } from '../types';
 import { LoadSection } from '../components/LoadSection';
+import { RPE_LABELS, rpeColor } from '../components/EffortPicker';
 
 const TYPE_LABEL: Record<ActivityType, string> = {
   ride: 'Bici', virtual_ride: 'Rodillo / virtual', run: 'Carrera', strength: 'Fuerza', workout: 'Entrenamiento', other: 'Otro',
@@ -106,7 +107,7 @@ export function History() {
       </div>
       <section className="panel">
         <table className="devices history-table">
-          <thead><tr><th>Fecha</th><th>Tipo</th><th>Nombre</th><th>Tiempo</th><th>Distancia</th><th>Desnivel</th><th>Potencia (NP)</th><th>Pulso</th><th>Carga</th></tr></thead>
+          <thead><tr><th>Fecha</th><th>Tipo</th><th>Nombre</th><th>Tiempo</th><th>Distancia</th><th>Desnivel</th><th>Potencia (NP)</th><th>Pulso</th><th>Carga</th><th>Esfuerzo</th></tr></thead>
           <tbody>
             {shown.slice(0, limit).map((a) => (
               <tr key={a.id}>
@@ -120,6 +121,9 @@ export function History() {
                 <td>{a.avg_hr ? `${fmt(a.avg_hr, 0)} / ${fmt(a.max_hr, 0)}` : '—'}</td>
                 <td title={loads.get(a.id)?.duplicateOf ? 'Grabada dos veces: cuenta la otra' : `Calculada con ${METHOD[loads.get(a.id)?.method ?? ''] ?? '—'}`}>
                   {loads.get(a.id)?.duplicateOf ? 'duplicada' : loads.has(a.id) ? `${fmt(loads.get(a.id)?.tss, 0)} · ${METHOD[loads.get(a.id)?.method ?? '']}` : '—'}
+                </td>
+                <td title={[a.rpe ? RPE_LABELS[Math.round(a.rpe)] : '', a.feeling ?? ''].filter(Boolean).join(' · ') || undefined}>
+                  {a.rpe ? <strong style={{ color: rpeColor(a.rpe) }}>{fmt(a.rpe, 0)}/10</strong> : '—'}{a.feeling ? ' ✎' : ''}
                 </td>
               </tr>
             ))}

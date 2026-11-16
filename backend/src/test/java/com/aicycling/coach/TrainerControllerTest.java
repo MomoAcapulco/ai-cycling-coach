@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -207,6 +208,23 @@ class TrainerControllerTest {
                 .andExpect(jsonPath("$.workoutPhase").value("WARMUP"));
         REPLIES.put("/workout/ftp/save", new Reply(409, "There is no FTP result to save"));
         mvc.perform(post("/api/trainer/workout/ftp/save")).andExpect(status().isConflict());
+    }
+
+    @Test
+    void feedbackAndDeletionAreForwarded() throws Exception {
+        REPLIES.put("/sessions/session_20261116_100000/feedback", new Reply(200, "{\"rpe\":7}"));
+        mvc.perform(post("/api/trainer/sessions/session_20261116_100000/feedback").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"rpe\":7}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rpe").value(7));
+        REPLIES.put("/sessions/session_20261116_100000", new Reply(200, "{\"deleted\":\"session_20261116_100000\"}"));
+        mvc.perform(delete("/api/trainer/sessions/session_20261116_100000"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.deleted").value("session_20261116_100000"));
+        REPLIES.put("/routes/mine.gpx", new Reply(200, "{\"deleted\":\"mine.gpx\"}"));
+        mvc.perform(delete("/api/trainer/routes/mine.gpx")).andExpect(status().isOk());
+        REPLIES.put("/routes/mine.gpx/replay", new Reply(409, "Datos insuficientes"));
+        mvc.perform(post("/api/trainer/routes/mine.gpx/replay")).andExpect(status().isConflict());
     }
 
     @Test

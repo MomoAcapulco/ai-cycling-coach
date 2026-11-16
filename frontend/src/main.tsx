@@ -9,6 +9,7 @@ import { Sessions } from './pages/Sessions';
 import { Routes } from './pages/Routes';
 import { History } from './pages/History';
 import { Workouts } from './pages/Workouts';
+import { Toasts } from './components/Toasts';
 
 
 function App() {
@@ -20,6 +21,7 @@ function App() {
       {route === 'ajustes' ? <Admin /> : route === 'sesiones' ? <Sessions /> : route === 'rutas' ? <Routes data={data} /> : route === 'historial' ? <History />
         : route === 'entrenamientos' ? <Workouts data={data} />
         : <Dashboard data={data} error={error} history={history} />}
+      <Toasts />
     </main>
   );
 }

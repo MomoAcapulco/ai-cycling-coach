@@ -30,6 +30,8 @@ COLUMNS = (
     ('hr_hist', 'TEXT'), ('best20_w', 'REAL'), ('enriched', 'INTEGER'),
     # best power of each duration from 1 to 60 min, {seconds: watts} (coach/history/ftp_model.py)
     ('mmp', 'TEXT'),
+    # how it felt: perceived effort 1–10 (this app's sessions, or Strava's «Esfuerzo percibido») and a note
+    ('rpe', 'REAL'), ('feeling', 'TEXT'),
 )
 TYPES = ('ride', 'virtual_ride', 'run', 'strength', 'workout', 'other')
 GAP_S = 3
@@ -91,6 +93,10 @@ class HistoryStore:
         with self.lock, self._db() as db:
             db.execute(f"UPDATE activities SET {', '.join(f'{n} = ?' for n in names)} WHERE id = ?",
                        [values[n] for n in names] + [activity_id])
+
+    def delete(self, activity_id: str):
+        with self.lock, self._db() as db:
+            db.execute('DELETE FROM activities WHERE id = ?', (activity_id,))
 
     def count_by(self):
         with self.lock, self._db() as db:
@@ -155,6 +161,7 @@ def app_session_row(summary: dict) -> dict:
     return {
         'id': f"app:{summary['session']}", 'source': 'app', 'start_utc': summary.get('startedAtUtc'),
         'type': 'virtual_ride', 'name': (summary.get('workout') or {}).get('name') or 'Sesión en el rodillo',
+        'rpe': (summary.get('feedback') or {}).get('rpe'), 'feeling': (summary.get('feedback') or {}).get('note'),
         'elapsed_s': summary.get('elapsedSeconds'), 'moving_s': summary.get('movingSeconds'),
         'distance_m': (summary.get('distanceKm') or 0) * 1000, 'ascent_m': summary.get('elevationGainM'),
         'avg_power': summary.get('avgPowerW'), 'max_power': summary.get('maxPowerW'),

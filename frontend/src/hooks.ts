@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from './api';
 import type { Sample, Telemetry } from './types';
+import { rememberLiveMode } from './liveMode';
 
 const POLL_MS = 1000;
 const MAX_BACKOFF_MS = 8000;
@@ -32,6 +33,7 @@ export function useTelemetry() {
         delay = POLL_MS;
         setData(d);
         setError('');
+        rememberLiveMode(d.mode);
         if (d.mode !== lastMode.current) {
           // A different source (changed in Ajustes) starts a new history.
           lastMode.current = d.mode;

@@ -9,6 +9,7 @@ import { WorkoutPanel } from '../components/WorkoutPanel';
 import { FtpNotice } from '../components/FtpNotice';
 import { GearPanel, Metrics, ReplayPlayer, SessionStats, StatusBar } from '../components/Panels';
 import { SessionBar } from '../components/SessionBar';
+import { toast } from '../toast';
 
 const SUBTITLE: Record<string, string> = {
   REPLAY: 'Reproducción de una sesión grabada · ninguna orden al rodillo',
@@ -19,7 +20,8 @@ const SUBTITLE: Record<string, string> = {
 export function Dashboard({ data, error, history }: { data: Telemetry | null; error: string; history: Sample[] }) {
   const replay = data?.source === 'REPLAY';
   const [session, setSession] = useState<Session | null>(null);
-  const [actionError, setActionError] = useState('');
+  /** Button errors go to the floating messages (toast.ts); '' means «it worked» and shows nothing. */
+  const setActionError = (msg: string) => { if (msg) toast.error(msg); };
   const [fullView, setFullView] = useState(false);
   const [route, setRoute] = useState<ActiveRoute | null>(null);
   const routeFile = data?.routeFile ?? null;
@@ -44,6 +46,16 @@ export function Dashboard({ data, error, history }: { data: Telemetry | null; er
   }, [replay, replayKey]);
 
   const points = replay ? session?.samples ?? [] : history;
+  // A replay of a session ridden on a route draws that route with the position of the moment.
+  const [replayRoute, setReplayRoute] = useState<{ name: string; profile: { d: number; e: number; g: number }[] } | null>(null);
+  const replayRouteFile = replay ? session?.routes?.[0]?.file ?? null : null;
+  useEffect(() => {
+    if (!replayRouteFile) { setReplayRoute(null); return; }
+    let alive = true;
+    api.routePreview(replayRouteFile).then((r) => { if (alive) setReplayRoute({ name: r.name, profile: r.profile }); })
+      .catch(() => { if (alive) setReplayRoute(null); });   // the route was deleted: the replay goes on without it
+    return () => { alive = false; };
+  }, [replayRouteFile]);
   // The big timer is the SESSION time: from «Iniciar sesión», running while you stop pedalling, without the
   // time spent in «Pausar». Before a session starts there is nothing to time and nothing to show: the numbers and
   // charts are the session's (hooks.useTelemetry) or the replay's. After «Terminar» the last session stays.
@@ -67,7 +79,7 @@ export function Dashboard({ data, error, history }: { data: Telemetry | null; er
   const hilly = altitudes.length > 1 && Math.max(...altitudes) - Math.min(...altitudes) >= 2;
   const gradeChanges = points.some((p) => p.grade != null && Math.abs(p.grade) >= 0.1);
   const hasHeart = points.some((p) => p.heart != null);
-  const shownError = error || actionError;
+  const shownError = error;   // the adapter not answering: a state of the page, so it stays in it
   const mode = data?.mode ?? data?.source ?? '';
 
   return (
@@ -93,17 +105,23 @@ export function Dashboard({ data, error, history }: { data: Telemetry | null; er
       <Metrics data={data} power3s={power3s} idle={idle} />
       {replay && <ReplayPlayer data={data} duration={duration} firstCommandAt={firstCommandAt} onError={setActionError} />}
       {data?.workoutType === 'STRUCTURED' && <WorkoutPanel data={data} power3s={power3s} onError={setActionError} />}
+      {replay && replayRoute && (
+        <section className="panel dash-panel">
+          <RouteProfile profile={replayRoute.profile} progressKm={data?.routeProgressKm ?? null} title={`Ruta: ${replayRoute.name}`} />
+        </section>
+      )}
       {route?.active && (
-        <section className="panel">
+        <section className="panel dash-panel">
           <RouteProfile profile={route.profile} progressKm={data?.routeProgressKm ?? route.progressKm}
             title={`Ruta: ${route.name}${data?.routeFinished ? ' · TERMINADA' : ''}`} />
         </section>
       )}
-      {!route?.active && hilly && (
-        <section className="panel"><ElevationProfile points={points} current={seconds} fullView={replay && fullView} /></section>
+      {/* the route's own profile (above) already draws the altitude and where you are: no second, emptier one */}
+      {!route?.active && !replayRoute && hilly && (
+        <section className="panel dash-panel"><ElevationProfile points={points} current={seconds} fullView={replay && fullView} /></section>
       )}
       {(gradeChanges || (replay && session?.gradeKind === 'ORDERED_NOT_MEASURED' && firstCommandAt != null)) && (
-        <section className="panel"><GradeProfile points={points} current={seconds} duration={duration} kind={session?.gradeKind} /></section>
+        <section className="panel dash-panel"><GradeProfile points={points} current={seconds} duration={duration} kind={session?.gradeKind} /></section>
       )}
       {replay && (
         <div className="display-mode">
@@ -122,7 +140,9 @@ export function Dashboard({ data, error, history }: { data: Telemetry | null; er
               <p className="muted">Las gráficas empiezan al pulsar «Iniciar sesión». Para ver una sesión ya hecha, ábrela desde Sesiones → «Ver en replay».</p>
             </article>
           )}
-          {(replay || history.length > 0) && ([['power', 'Potencia', '#6ce8af', 'W'], ['heart', 'Frecuencia cardíaca', '#fb8c83', 'ppm'], ['cadence', 'Cadencia', '#aab5ff', 'rpm'], ['speed', 'Velocidad', '#f6c180', 'km/h']] as const).filter(([field]) => field !== 'heart' || hasHeart).map(
+          {(replay || history.length > 0) && ([['power', 'Potencia', '#6ce8af', 'W'], ['heart', 'Frecuencia cardíaca', '#fb8c83', 'ppm'], ['cadence', 'Cadencia', '#aab5ff', 'rpm'], ['speed', 'Velocidad', '#f6c180', 'km/h']] as const)
+            // a replay shows only what was recorded (a GPX from Strava may bring no power); live, the heart only with a strap
+            .filter(([field]) => (replay ? points.some((p) => p[field] != null) : field !== 'heart' || hasHeart)).map(
             ([field, title, color, unit]) => (
               <article className="panel" key={field}>
                 <div className="panel-heading">

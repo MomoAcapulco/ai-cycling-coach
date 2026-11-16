@@ -1,5 +1,6 @@
 """Local CSV session capture and offline replay; no Bluetooth dependencies."""
 import csv
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import Event
@@ -113,6 +114,9 @@ def record_once(trainer_snapshot, hr_snapshot, stop: Event, directory: Path,
 def _numeric(value, cast, default):
     if value is None or value == '':
         return default
+    if cast is int:
+        # Replays of converted GPX activities may carry '103.0' (sensor values are decimals in GPX).
+        return int(round(float(value)))
     return cast(value)
 
 
@@ -140,11 +144,27 @@ class CsvReplay:
         if any(b < a for a, b in zip(self.timeline, self.timeline[1:])):
             raise ValueError('Replay timestamps must be ascending')
         self.duration = self.timeline[-1]
+        self.gains = self._elevation_gains()
         self.offset = 0.0
         self.started = clock()
         self.paused = True        # waits at 0:00 for «Reproducir»: nothing plays until the rider asks
         self.speed = 1.0
         self.filename = path
+
+    def _elevation_gains(self):
+        """Climbing so far at each row: the recorded «elevationGainM» of a session, or, for a converted GPX
+        activity (no such column), the sum of the rises of its altitude (already smoothed like the Routes page)."""
+        if any(r.get('elevationGainM') not in (None, '') for r in self.rows):
+            return [_numeric(r.get('elevationGainM'), float, None) for r in self.rows]
+        gains, total, last = [], 0.0, None
+        for row in self.rows:
+            altitude = _numeric(row.get('altitudeM'), float, None)
+            if altitude is not None:
+                if last is not None and altitude > last:
+                    total += altitude - last
+                last = altitude
+            gains.append(round(total, 1) if last is not None else None)
+        return gains
 
     def _position(self):
         if self.paused:
@@ -171,7 +191,7 @@ class CsvReplay:
                     raise ValueError('seek requires numeric value')
                 self.offset = min(self.duration, max(0.0, float(value)))
             elif action == 'speed':
-                if value not in (0.5, 1, 1.0, 2, 2.0, 4, 4.0):
+                if value not in (0.5, 1, 1.0, 2, 2.0, 4, 4.0, 8, 8.0, 16, 16.0):   # 8–16×: rides of hours
                     raise ValueError('speed must be 0.5, 1, 2 or 4')
                 self.offset, self.speed = current, float(value)
             else:
@@ -204,7 +224,15 @@ class CsvReplay:
                 'altitude': round(altitude - first_altitude, 1) if altitude is not None and first_altitude is not None else None,
             })
         kind = 'ROAD' if any(s['distance'] is not None for s in samples) else 'ORDERED_NOT_MEASURED'
-        return {'durationSeconds': self.duration, 'samples': samples, 'gradeKind': kind}
+        return {'durationSeconds': self.duration, 'samples': samples, 'gradeKind': kind, 'routes': self._routes()}
+
+    def _routes(self):
+        """The routes ridden in the session (its summary, next to the CSV), to draw them in the replay."""
+        try:
+            summary = json.loads(self.filename.with_suffix('.json').read_text(encoding='utf-8'))
+            return summary.get('routes') or []
+        except (OSError, ValueError):
+            return []
 
     def snapshot(self):
         from bisect import bisect_right
@@ -227,6 +255,8 @@ class CsvReplay:
             'replaySpeed': speed, 'replayDurationSeconds': self.duration, 'replayFile': self.filename.name,
             'lastUpdateSeconds': 0.0, 'error': None,
             'heartRateBpm': _numeric(row['heartRateBpm'], int, None) if hr_active else None,
+            'routeName': row.get('routeName') or None,                         # a session ridden on a route
+            'routeProgressKm': _numeric(row.get('routeProgressKm'), float, None),
             'heartRateConnected': hr_active,
             'heartRateStatus': 'REPLAY' if hr_active else 'WAITING',
             'heartRateLastUpdateSeconds': 0.0 if hr_active else None,
@@ -234,6 +264,9 @@ class CsvReplay:
             'targetGradePercent': _numeric(row.get('targetGradePercent'), float, None),
             'gradePercent': _numeric(row.get('gradePercent'), float, None),
             'estimatedDistanceKm': _numeric(row.get('estimatedDistanceKm'), float, None),
+            'rideDistanceKm': _numeric(row.get('rideDistanceKm'), float, None),
+            'altitudeM': _numeric(row.get('altitudeM'), float, None),
+            'elevationGainM': self.gains[pos],
             'mechanicalWorkKj': _numeric(row.get('mechanicalWorkKj'), float, None),
             'roadGradePercent': _numeric(row.get('roadGradePercent'), float, None),
             'rideSpeedKph': _numeric(row.get('rideSpeedKph'), float, None) if active else None,

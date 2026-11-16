@@ -4,7 +4,9 @@ import { clock, fmt } from '../format';
 import type { Telemetry, WorkoutLibrary } from '../types';
 import { Help } from '../components/Help';
 import { FtpNotice } from '../components/FtpNotice';
+import { LIVE_LABEL, exitReplay, lastLiveMode } from '../liveMode';
 import { WorkoutBlocks, ZoneLegend } from '../components/WorkoutBlocks';
+import { toast } from '../toast';
 
 /**
  * The workout library: blocks with a power target (% of your FTP), ridden without ERG — you reach each target with
@@ -22,7 +24,7 @@ export function Workouts({ data }: { data: Telemetry | null }) {
   const start = async (id: string) => {
     setBusy(true);
     try { await api.startWorkout(id); window.location.hash = '#/'; }
-    catch (e) { setError(`No se pudo empezar: ${message(e)}`); }
+    catch (e) { toast.error(`No se pudo empezar: ${message(e)}`); }
     finally { setBusy(false); }
   };
 
@@ -30,7 +32,7 @@ export function Workouts({ data }: { data: Telemetry | null }) {
   const replay = data?.source === 'REPLAY';
   const onRoute = !!data?.routeFile && !data?.routeFinished;
   const ftp = library?.ftpW ?? null;
-  const blocked = running ? 'Ya hay un entrenamiento en marcha (Panel).' : replay ? 'En modo replay no se puede entrenar: cambia a rodillo real o simulador en Ajustes.'
+  const blocked = running ? 'Ya hay un entrenamiento en marcha (Panel).' : replay ? 'Estás viendo un replay: para entrenar o hacer el test de FTP, sal del replay.'
     : onRoute ? 'Sal de la ruta primero: los entrenamientos se ruedan en llano.' : !ftp ? 'Hace falta tu FTP.' : '';
 
   return (
@@ -38,7 +40,13 @@ export function Workouts({ data }: { data: Telemetry | null }) {
       <div className="heading">
         <div>
           <p className="eyebrow">ENTRENAMIENTOS</p>
-          <h1>Entrenamientos estructurados</h1>
+          <h1>Entrenamientos estructurados <Help title="Cómo funcionan los entrenamientos">
+        <p>Sin ERG: la aplicación te enseña el objetivo de vatios de cada bloque y tú lo alcanzas con las marchas y la cadencia.
+          Al empezar se inicia una sesión (si no había una) y vas al Panel. «Pausar» la sesión pausa también el entrenamiento.</p>
+        <p>Al terminar cada bloque se puntúa: <strong>cumplimiento</strong> (tu potencia media frente al objetivo medio) y
+          <strong> en rango</strong> (el tiempo a ±10 % del objetivo). Todo queda en la sesión, con su FIT.</p>
+        <p>IF y TSS son los del entrenamiento hecho tal cual.</p>
+      </Help></h1>
           <p className="muted">
             {ftp ? <>Objetivos calculados con tu FTP de <strong>{ftp} W</strong>{library?.ftpSource === 'history' ? ' (estimado con tu historial)' : ''}.</>
               : library ? <>Sin FTP no hay objetivos: haz el <a href="#/">test de FTP</a> en el Panel o ponlo en <a href="#/ajustes">Ajustes</a>.</> : 'Cargando…'}
@@ -46,15 +54,13 @@ export function Workouts({ data }: { data: Telemetry | null }) {
         </div>
       </div>
       {error && <div className="alert">{error}</div>}
-      {blocked && library && <div className="notice">{blocked}</div>}
-      <FtpNotice always onChanged={() => void loadLibrary()} />
-      <Help>
-        <p>Sin ERG: la aplicación te enseña el objetivo de vatios de cada bloque y tú lo alcanzas con las marchas y la cadencia.
-          Al empezar se inicia una sesión (si no había una) y vas al Panel. «Pausar» la sesión pausa también el entrenamiento.</p>
-        <p>Al terminar cada bloque se puntúa: <strong>cumplimiento</strong> (tu potencia media frente al objetivo medio) y
-          <strong> en rango</strong> (el tiempo a ±10 % del objetivo). Todo queda en la sesión, con su FIT.</p>
-        <p>IF y TSS son los del entrenamiento hecho tal cual.</p>
-      </Help>
+      {blocked && library && (
+        <div className="notice">{blocked}
+          {replay && <> <button disabled={busy} onClick={() => { setBusy(true); exitReplay().catch((e) => toast.error(`No se pudo salir del replay: ${message(e)}`)).finally(() => setBusy(false)); }}>
+            Salir del replay (volver a {LIVE_LABEL[lastLiveMode()]})</button></>}
+        </div>
+      )}
+      <FtpNotice always replay={replay} onChanged={() => void loadLibrary()} />
       <ZoneLegend />
       {library?.workouts.map((w) => (
         <article className="panel session-card" key={w.id}>

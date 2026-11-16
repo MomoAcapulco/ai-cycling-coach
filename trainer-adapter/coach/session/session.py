@@ -8,6 +8,7 @@
 """
 import csv
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import Event, Lock, Thread
@@ -22,6 +23,10 @@ SESSION_FIELDS = FIELDS + ['trainerGear', 'requestedGear', 'gearStatus', 'virtua
                            'roadGradePercent', 'rideSpeedKph', 'rideDistanceKm', 'altitudeM', 'elevationGainM',
                            'vamMh', 'wattsPerKg', 'routeName', 'routeProgressKm', 'targetPowerW']
 MAX_SESSION_SECONDS = 4 * 3600
+SESSION_STEM = re.compile(r'session_\d{8}_\d{6}')
+MAX_NOTE = 500
+RPE_LABELS = {1: 'muy, muy suave', 2: 'muy suave', 3: 'suave', 4: 'moderado', 5: 'algo duro', 6: 'duro',
+              7: 'muy duro', 8: 'muy, muy duro', 9: 'casi máximo', 10: 'máximo'}
 SAMPLE_SECONDS = 1.0
 
 
@@ -62,6 +67,7 @@ class SessionManager:
             self._writer = csv.DictWriter(self._file, fieldnames=SESSION_FIELDS, extrasaction='ignore')
             self._writer.writeheader()
             self.metrics = SessionMetrics()
+            self.routes = {}          # routes ridden in the session: file -> {name, km}
             self.state = 'RUNNING'
             self._last_tick = self.clock()
             if self.capture is not None:
@@ -105,6 +111,8 @@ class SessionManager:
                        'csv': f'{self.stem}.csv',
                        'rawCapture': f'{self.stem}_ble_raw.jsonl' if self.capture is not None else None,
                        **self.metrics.summary(self.ftp(), self.rider_kg())}
+            if self.routes:
+                summary['routes'] = [{'file': f, **r} for f, r in self.routes.items()]
             try:
                 summary.update(self.extra() or {})
             except Exception as exc:  # the summary must be written whatever happens
@@ -138,6 +146,9 @@ class SessionManager:
         self._last_tick = now
         reading = dict(self.reading())
         self.metrics.add(reading, dt)
+        if reading.get('routeFile'):
+            ridden = self.routes.setdefault(reading['routeFile'], {'name': reading.get('routeName'), 'km': 0.0})
+            ridden['km'] = round(max(ridden['km'], reading.get('routeProgressKm') or 0.0), 2)
         connected = bool(reading.get('connected'))
         row = {key: reading.get(key) for key in SESSION_FIELDS}
         row.update({'recordedAtUtc': self.now().isoformat(timespec='milliseconds'),
@@ -166,6 +177,38 @@ class SessionManager:
     def snapshot(self):
         with self.lock:
             return self.snapshot_unlocked()
+
+
+def save_feedback(folder: Path, stem: str, body: dict) -> dict:
+    """How the session felt: ``rpe`` (perceived effort 1–10, Borg CR10 like Strava and TrainingPeaks; null clears it)
+    and an optional ``note``. Kept in the session summary («feedback»); never changes the metrics."""
+    if not SESSION_STEM.fullmatch(stem or ''):
+        raise FileNotFoundError(stem)
+    path = Path(folder) / f'{stem}.json'
+    summary = json.loads(path.read_text(encoding='utf-8'))      # FileNotFoundError when there is no such session
+    rpe, note = body.get('rpe'), body.get('note', '')
+    if rpe is not None and (isinstance(rpe, bool) or not isinstance(rpe, int) or not 1 <= rpe <= 10):
+        raise ValueError('rpe must be a whole number from 1 to 10, or null')
+    if note is None:
+        note = ''
+    if not isinstance(note, str) or len(note) > MAX_NOTE:
+        raise ValueError(f'note must be a text of at most {MAX_NOTE} characters')
+    feedback = {'rpe': rpe, 'note': note.strip() or None,
+                'updatedUtc': datetime.now(timezone.utc).isoformat(timespec='seconds')}
+    summary['feedback'] = feedback
+    tmp = path.with_name(path.name + '.tmp')
+    tmp.write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding='utf-8')
+    tmp.replace(path)
+    return feedback
+
+
+def delete_session(folder: Path, stem: str) -> dict:
+    """Move a finished session (CSV, summary, Bluetooth capture) to the trash of the recordings folder."""
+    from coach.app.routes_store import to_trash
+    if not SESSION_STEM.fullmatch(stem or '') or not (Path(folder) / f'{stem}.json').is_file():
+        raise FileNotFoundError(stem)
+    moved = to_trash(folder, [f'{stem}.csv', f'{stem}.json', f'{stem}_ble_raw.jsonl'])
+    return {'deleted': stem, 'moved': moved}
 
 
 def list_sessions(folder: Path):

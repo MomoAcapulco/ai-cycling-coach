@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { api, sessionFileUrl } from '../api';
 import { clock, fmt } from '../format';
 import type { LoadReport, SessionSummary, SessionWorkout } from '../types';
+import { EffortPicker } from '../components/EffortPicker';
+import { toast } from '../toast';
 
 const EFFORTS: [string, string][] = [['5', '5 s'], ['60', '1 min'], ['300', '5 min'], ['1200', '20 min']];
 
@@ -70,13 +72,21 @@ export function Sessions() {
   const ftpNote = load?.params.ftp_source === 'history' ? ' (FTP estimado)' : '';
   const loadOf = (s: SessionSummary) => load?.activities.find((a) => a.id === `app:${s.session}`);
 
+  const remove = async (s: SessionSummary) => {
+    if (!window.confirm(`¿Borrar la sesión del ${date(s.startedAtUtc)}? Se mueve a la papelera de la carpeta de grabaciones (.papelera) `
+      + 'y deja de contar en el historial; se puede recuperar a mano.')) return;
+    setBusy(true);
+    try { await api.deleteSession(s.session); setSessions((all) => (all ?? []).filter((x) => x.session !== s.session)); }
+    catch (e) { toast.error(`No se pudo borrar: ${e instanceof Error ? e.message : e}`); }
+    finally { setBusy(false); }
+  };
   const replay = async (s: SessionSummary) => {
     setBusy(true);
     try {
       await api.saveSettings({ mode: 'REPLAY', replayFile: s.csv });
       window.location.hash = '#/';
     } catch (e) {
-      setError(`No se pudo abrir en replay: ${e instanceof Error ? e.message : e}`);
+      toast.error(`No se pudo abrir en replay: ${e instanceof Error ? e.message : e}`);
     } finally {
       setBusy(false);
     }
@@ -119,11 +129,13 @@ export function Sessions() {
             <div><span>W/kg medio</span><strong>{fmt(s.avgWattsPerKg, 2)}</strong></div>
             <div><span>FTP de esta sesión</span><strong>{s.estimatedFtpW == null ? 'necesita 20 min' : `${fmt(s.estimatedFtpW, 0)} W · ${fmt(s.best20MinWattsPerKg != null ? s.best20MinWattsPerKg * 0.95 : null, 2)} W/kg`}</strong></div>
           </div>
+          {s.routes?.length ? <p className="workout-line">Ruta: {s.routes.map((r) => `${r.name ?? r.file} (${fmt(r.km, 1)} km)`).join(' · ')}</p> : null}
           {s.workout && <WorkoutResult w={s.workout} />}
           {s.bestEffortsW && (
             <p className="tiny">Mejores esfuerzos: {EFFORTS.map(([k, label]) => `${label} ${s.bestEffortsW?.[k] == null ? '—' : `${fmt(s.bestEffortsW[k], 0)} W`}`).join(' · ')}</p>
           )}
           {Object.keys(s.gearSeconds ?? {}).length > 0 && <GearBars seconds={s.gearSeconds} />}
+          <EffortPicker session={s.session} initial={s.feedback} />
           <div className="admin-actions">
             <button disabled={busy} onClick={() => void replay(s)}>Ver en replay</button>
             <a className="button-link primary" href={sessionFileUrl(`${s.session}.fit`)} download
@@ -132,6 +144,7 @@ export function Sessions() {
               <details className="more-menu">
                 <summary className="button-link">Más ▾</summary>
                 <div>
+                  <button className="menu-danger" disabled={busy} onClick={() => void remove(s)}>Mover a la papelera</button>
                   {s.files.map((f) => (
                     <a key={f} href={sessionFileUrl(f)} download>
                       {f.endsWith('.csv') ? 'Datos (CSV)' : f.endsWith('_ble_raw.jsonl') ? 'Captura Bluetooth (diagnóstico)' : 'Resumen (JSON)'}

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { api } from '../api';
 import { clock, fmt } from '../format';
 import type { SessionSummary, Telemetry } from '../types';
+import { EffortPicker } from './EffortPicker';
 
 const STATE_LABEL: Record<string, string> = { IDLE: 'SIN SESIÓN', RUNNING: 'GRABANDO', PAUSED: 'EN PAUSA' };
 
@@ -45,6 +46,7 @@ export function SessionBar({ data, onError }: { data: Telemetry | null; onError:
           </span>
         )}
       </div>
+      {state === 'IDLE' && finished?.session && <EffortPicker session={finished.session} compact />}
       <div className="session-actions">
         {state === 'IDLE' && <button className="primary" disabled={busy} onClick={() => void run('start')}>● Iniciar sesión</button>}
         {state === 'RUNNING' && <button disabled={busy} onClick={() => void run('pause')}>⏸ Pausar</button>}

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api';
 import type { DeviceRole, DevicesState, RememberedDevice } from '../types';
 import { Help } from './Help';
+import { toast } from '../toast';
 
 /** A Bluetooth id is long: the end is enough to tell them apart; the whole one on hover. */
 const shortId = (id: string) => (id.length > 14 ? `…${id.slice(-8)}` : id);
@@ -23,7 +24,6 @@ const signal = (rssi: number | null) => (rssi == null ? '' : rssi > -60 ? 'seña
  */
 export function DevicesSection({ initial }: { initial: DevicesState | null }) {
   const [devices, setDevices] = useState<DevicesState | null>(initial);
-  const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => { setDevices(initial); }, [initial]);
@@ -34,8 +34,8 @@ export function DevicesSection({ initial }: { initial: DevicesState | null }) {
 
   const run = async (action: () => Promise<DevicesState>) => {
     setBusy(true);
-    try { setDevices(await action()); setError(''); }
-    catch (e) { setError(`Dispositivos: ${e instanceof Error ? e.message : e}`); }
+    try { setDevices(await action()); }
+    catch (e) { toast.error(`Dispositivos: ${e instanceof Error ? e.message : e}`); }
     finally { setBusy(false); }
   };
   const use = (role: DeviceRole, d: { address: string }) => void run(() => api.useDevice(role, d.address));
@@ -46,16 +46,14 @@ export function DevicesSection({ initial }: { initial: DevicesState | null }) {
 
   return (
     <section className="panel">
-      <div className="panel-heading"><h2>Dispositivos</h2><span>AUTODESCUBRIMIENTO</span></div>
-      {error && <div className="alert">{error}</div>}
-      <Help>
+      <div className="panel-heading"><h2>Dispositivos <Help title="Cómo funcionan los dispositivos">
       <p>
         Se encuentran por su tipo (lo que anuncian por Bluetooth), de cualquier marca, y se recuerdan todos los que has
         usado ({devices?.registryFile ?? '—'}). Al conectar se usa el preferido si está
         cerca; si no, el último que usaste. Si hay varios desconocidos y ninguno conocido, no se elige al azar: aparecen
         aquí para que elijas. El pulsómetro y los mandos cambian al momento; el rodillo, en la siguiente conexión.
       </p>
-      </Help>
+      </Help></h2><span>AUTODESCUBRIMIENTO</span></div>
       {ROLES.map((role) => {
         const known = devices?.known?.[role] ?? [];
         const pending = devices?.pending?.[role] ?? [];

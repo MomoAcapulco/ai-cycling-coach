@@ -1,4 +1,4 @@
-import type { ActiveRoute, Activity, HistoryWeek, LoadReport, RouteSummary, WorkoutLibrary, FtpAdvice, GeneratedRoute } from './types';
+import type { ActiveRoute, Activity, HistoryWeek, LoadReport, RouteSummary, WorkoutLibrary, FtpAdvice, GeneratedRoute, SessionFeedback } from './types';
 import type { AdminState, DevicesState, ProfileState, Recording, RiderProfile, Session, SessionSummary, Settings, Telemetry } from './types';
 
 const BASE = '/api/trainer';
@@ -89,6 +89,12 @@ export const api = {
       method: 'POST', headers: { 'Content-Type': 'application/gpx+xml' }, body: file,
     }),
   route: () => request<ActiveRoute>('/route'),
+  deleteRoute: (file: string) => request<{ deleted: string }>(`/routes/${encodeURIComponent(file)}`, { method: 'DELETE' }),
+  deleteSession: (session: string) => request<{ deleted: string }>(`/sessions/${session}`, { method: 'DELETE' }),
+  routeReplay: (file: string) => request<{ replayFile: string }>(`/routes/${encodeURIComponent(file)}/replay`, json({})),
+  renameRoute: (file: string, name: string) => request<RouteSummary>('/routes/rename', json({ file, name })),
+  sessionFeedback: (session: string, body: { rpe: number | null; note: string }) =>
+    request<SessionFeedback>(`/sessions/${session}/feedback`, json(body)),
   generateRoute: (body: object) => request<GeneratedRoute>('/routes/generate', json(body)),
   routePreview: (file: string) =>
     request<RouteSummary & { profile: { d: number; e: number; g: number }[] }>(`/routes/${encodeURIComponent(file)}`),

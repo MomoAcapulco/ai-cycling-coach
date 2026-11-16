@@ -5,6 +5,7 @@ import type { AdminState, DevicesState, Mode, Recording, Settings } from '../typ
 import { DevicesSection } from '../components/DevicesSection';
 import { ProfileSection } from '../components/ProfileSection';
 import { Help } from '../components/Help';
+import { toast } from '../toast';
 
 const MODES: { mode: Mode; title: string; text: string }[] = [
   { mode: 'WAHOO', title: 'Rodillo real', text: 'Lee el rodillo por Bluetooth. Sin órdenes de resistencia.' },
@@ -21,7 +22,6 @@ export function Admin() {
   const [recordings, setRecordings] = useState<Recording[]>([]);
   const [devices, setDevices] = useState<DevicesState | null>(null);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -53,7 +53,6 @@ export function Admin() {
 
   const apply = async () => {
     setBusy(true);
-    setNotice('');
     try {
       const changes = Object.fromEntries(
         Object.entries(draft).filter(([k, v]) => current[k as keyof Settings] !== v),
@@ -61,10 +60,9 @@ export function Admin() {
       const result = await api.saveSettings(changes);
       setAdmin(result);
       setDraft(result.settings);
-      setError('');
-      setNotice('Ajustes aplicados. El panel ya muestra la nueva fuente de datos.');
+      toast.ok('Ajustes aplicados. El panel ya muestra la nueva fuente de datos.');
     } catch (e) {
-      setError(`No se aplicaron los ajustes: ${message(e)}`);
+      toast.error(`No se aplicaron los ajustes: ${message(e)}`);
     } finally {
       setBusy(false);
     }
@@ -77,10 +75,9 @@ export function Admin() {
       const result = await api.resetSettings();
       setAdmin(result);
       setDraft(result.settings);
-      setError('');
-      setNotice('Valores por defecto restaurados.');
+      toast.ok('Valores por defecto restaurados.');
     } catch (e) {
-      setError(`No se pudieron restaurar los valores por defecto: ${message(e)}`);
+      toast.error(`No se pudieron restaurar los valores por defecto: ${message(e)}`);
     } finally {
       setBusy(false);
     }
@@ -89,16 +86,14 @@ export function Admin() {
   const upload = async (file: File | undefined) => {
     if (!file) return;
     setBusy(true);
-    setNotice('');
     try {
       const saved = await api.uploadRecording(file);
       const list = await api.recordings();
       setRecordings(list.recordings);
       set({ mode: 'REPLAY', replayFile: saved.path });
-      setError('');
-      setNotice(`Grabación «${saved.name}» subida (${saved.samples} muestras, ${clock(saved.durationSeconds)}). Pulsa «Aplicar» para reproducirla.`);
+      toast.ok(`Grabación «${saved.name}» subida (${saved.samples} muestras, ${clock(saved.durationSeconds)}). Pulsa «Aplicar» para reproducirla.`);
     } catch (e) {
-      setError(`No se pudo subir «${file.name}»: ${message(e)}`);
+      toast.error(`No se pudo subir «${file.name}»: ${message(e)}`);
     } finally {
       setBusy(false);
       if (fileInput.current) fileInput.current.value = '';
@@ -116,7 +111,6 @@ export function Admin() {
       </div>
 
       {error && <div className="alert">{error}</div>}
-      {notice && <div className="notice">{notice}</div>}
       {locked && (
         <div className="alert">
           El control físico experimental está activado en .env (CONTROL_TEST_ENABLED). Mientras lo esté, la configuración queda fijada: rodillo real, grabación de 600 s.
@@ -178,16 +172,15 @@ export function Admin() {
 
       {draft.mode === 'WAHOO' && (
         <section className="panel">
-          <div className="panel-heading"><h2>Control de marchas del rodillo</h2><span>ZWIFT COG · SOLO RODILLO REAL</span></div>
+          <div className="panel-heading"><h2>Control de marchas del rodillo <Help title="Cómo funciona el control de marchas"><p>
+            24 marchas de Zwift, empieza en la 12. Cada cambio lo confirma el rodillo; sin pedalear no se endurece;
+            al salir vuelve a la 12. La pendiente no cambia. Usa los pesos del perfil del ciclista.
+          </p></Help></h2><span>ZWIFT COG · SOLO RODILLO REAL</span></div>
           <label className="switch">
             <input type="checkbox" checked={draft.gearControlEnabled} disabled={locked}
               onChange={(e) => set({ gearControlEnabled: e.target.checked })} />
             <span>Las marchas (mandos y botones del panel) cambian la resistencia del rodillo</span>
           </label>
-          <Help><p>
-            24 marchas de Zwift, empieza en la 12. Cada cambio lo confirma el rodillo; sin pedalear no se endurece;
-            al salir vuelve a la 12. La pendiente no cambia. Usa los pesos del perfil del ciclista.
-          </p></Help>
           {draft.gearControlEnabled && !draft.zwiftEnabled && <p className="tiny warn">Activa también los mandos Zwift para cambiar con ellos.</p>}
         </section>
       )}

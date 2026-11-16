@@ -140,15 +140,15 @@ def _custom_segments(p: dict, seed: int, climb_scale: float) -> List[Segment]:
     return segments
 
 
-def generate_custom(params: dict, seed: Optional[int] = None) -> Tuple[Route, bytes, int]:
-    """(parsed route, GPX bytes, seed) for the custom parameters."""
+def generate_custom(params: dict, seed: Optional[int] = None, name: Optional[str] = None) -> Tuple[Route, bytes, int]:
+    """(parsed route, GPX bytes, seed) for the custom parameters. ``name``: the rider's, else one is proposed."""
     p = check(params)
     seed = _seed(seed)
-    name = f'Generada · {p["distanceKm"]:.0f} km · {p["gainM"]:.0f} m+ · {int(p["climbs"])} subidas'
+    name = route_name(name) or f'{p["distanceKm"]:.0f} km · {p["gainM"]:.0f} m+ · {int(p["climbs"])} subidas'
     scale, route, data = 1.0, None, b''
     for _ in range(4):                       # match the gain as the route page measures it (50 m smoothing)
         segments = _custom_segments(p, seed, scale)
-        data = to_gpx(segments, f'{name} (semilla {seed})')
+        data = to_gpx(segments, name, seed)
         route = parse_gpx(data, 'generated.gpx')
         if p['gainM'] == 0 or route.gain_m == 0 or abs(route.gain_m - p['gainM']) <= 0.01 * p['gainM']:
             break
@@ -177,7 +177,8 @@ def find_climbs(route: Route) -> List[Tuple[int, int]]:
     return climbs
 
 
-def generate_like(race: Route, distance_km: float, seed: Optional[int] = None) -> Tuple[Route, bytes, int]:
+def generate_like(race: Route, distance_km: float, seed: Optional[int] = None,
+                  name: Optional[str] = None) -> Tuple[Route, bytes, int]:
     if not isinstance(distance_km, (int, float)) or isinstance(distance_km, bool) or not 5 <= distance_km <= 200:
         raise ValueError('distanceKm must be a number between 5 and 200')
     seed = _seed(seed)
@@ -218,12 +219,24 @@ def generate_like(race: Route, distance_km: float, seed: Optional[int] = None) -
         segments += _flat(rng, rest * gap / sum(gaps))
         if i < len(chosen):
             segments += chosen[i][2]
-    name = f'Como {race.name} · {distance_km:.0f} km'
-    data = to_gpx(segments, f'{name} (semilla {seed})')
+    name = route_name(name) or f'{race.name} · versión de {distance_km:.0f} km'
+    data = to_gpx(segments, name, seed)
     return parse_gpx(data, 'generated.gpx'), data, seed
 
 
 # ---- GPX ---------------------------------------------------------------------------------------------------------
+MAX_NAME = 80
+
+
+def route_name(name) -> Optional[str]:
+    """A rider's route name, trimmed; None for none (then one is proposed)."""
+    if name is None:
+        return None
+    if not isinstance(name, str) or len(name.strip()) > MAX_NAME:
+        raise ValueError(f'name must be a text of at most {MAX_NAME} characters')
+    return ' '.join(name.split()) or None
+
+
 def _seed(seed: Optional[int]) -> int:
     if seed is None:
         return random.randrange(1, 100000)
@@ -232,7 +245,7 @@ def _seed(seed: Optional[int]) -> int:
     return seed
 
 
-def to_gpx(segments: List[Segment], name: str) -> bytes:
+def to_gpx(segments: List[Segment], name: str, seed: Optional[int] = None) -> bytes:
     """A GPX track with a point every POINT_M along a smooth synthetic line, with the elevation of ``segments``."""
     total = _length(segments)
     rng = random.Random(len(segments))
@@ -260,6 +273,6 @@ def to_gpx(segments: List[Segment], name: str) -> bytes:
         points.append(f'<trkpt lat="{lat:.7f}" lon="{lon:.7f}"><ele>{ele + lift:.1f}</ele></trkpt>')
     return ('<?xml version="1.0" encoding="UTF-8"?>\n'
             '<gpx version="1.1" creator="AI Cycling Coach (generated route)" xmlns="http://www.topografix.com/GPX/1/1">'
-            f'<metadata><name>{escape(name)}</name><desc>Ruta generada: recorrido sintético (solo cuentan la distancia '
-            f'y el desnivel)</desc></metadata><trk><name>{escape(name)}</name><trkseg>'
+            f'<metadata><name>{escape(name)}</name><desc>Ruta generada{f" (variante {seed})" if seed is not None else ""}: '
+            f'recorrido sintético (solo cuentan la distancia y el desnivel)</desc></metadata><trk><name>{escape(name)}</name><trkseg>'
             + ''.join(points) + '</trkseg></trk></gpx>').encode('utf-8')

@@ -1,5 +1,6 @@
 """HTTP API of the trainer adapter. Started by trainer-adapter/server.py."""
 import os
+import re
 import signal
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -149,6 +150,8 @@ HR_DISABLED = {
 }
 
 
+REPLAY_MIN_SECONDS = 60     # a route session shorter than this, or with less of the route ridden, is not replayed:
+REPLAY_MIN_KM = 0.2         # «datos insuficientes»
 SIMULATED_RIDER_LIMIT_W = 260   # in SIMULATOR the simulated rider follows a workout target up to this power
 
 
@@ -239,8 +242,26 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == '/routes' and self.admin is not None:
             from coach.app.routes_store import list_routes
+            from coach.session.session import list_sessions
             ride = state.ride
-            self.respond({'routes': list_routes(self.admin.env.routes_dir), 'folder': str(self.admin.env.routes_dir),
+            routes = list_routes(self.admin.env.routes_dir)
+            rides = {}                                    # route file -> its sessions, newest first
+            for session in list_sessions(self.admin.env.record_dir):
+                for ridden in session.get('routes') or []:
+                    seconds, km = session.get('elapsedSeconds') or 0, ridden.get('km') or 0
+                    why = ('falta el CSV de la sesión' if session.get('csv') not in session.get('files', [])
+                           else f'la sesión duró solo {seconds:.0f} s' if seconds < REPLAY_MIN_SECONDS
+                           else f'solo se rodaron {km * 1000:.0f} m de la ruta' if km < REPLAY_MIN_KM else None)
+                    rides.setdefault(ridden['file'], []).append(
+                        {'session': session['session'], 'date': session.get('startedAtUtc'), 'km': km,
+                         'seconds': seconds, 'csv': session.get('csv'), 'replayable': why is None, 'why': why,
+                         'rpe': (session.get('feedback') or {}).get('rpe')})
+            for route in routes:
+                ridden = rides.get(route['file'], [])
+                route['rides'] = len(ridden)
+                route['lastRide'] = ridden[0] if ridden else None
+                route['replayRide'] = next((r for r in ridden if r['replayable']), None)   # the newest that can be replayed
+            self.respond({'routes': routes, 'folder': str(self.admin.env.routes_dir),
                           'current': ride.route.file if ride is not None and ride.route is not None else None,
                           'available': self.route_unavailable() is None})
             return
@@ -466,6 +487,43 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/admin/settings/reset' and self.admin is not None:
                 self.respond(self.admin.reset_to_env())
                 return
+            feedback = re.fullmatch(r'/sessions/(session_\d{8}_\d{6})/feedback', path)
+            if feedback and self.admin is not None:
+                from coach.session.session import save_feedback
+                try:
+                    saved = save_feedback(self.admin.env.record_dir, feedback.group(1), self.read_json())
+                except FileNotFoundError:
+                    self.send_error(404, 'No such session')
+                    return
+                store = self.history_store()          # the history (and later the AI) sees it too
+                store.update(f'app:{feedback.group(1)}', {'rpe': saved['rpe'], 'feeling': saved['note']})
+                self.respond(saved)
+                return
+            replay = re.fullmatch(r'/routes/([^/]+\.gpx)/replay', path)
+            if replay and self.admin is not None:
+                # a recorded GPX (one of your rides) played like a session (coach/session/gpx_activity.py)
+                from coach.app.routes_store import load_route
+                from coach.session.gpx_activity import NotEnoughData, build_replay
+                try:
+                    route = load_route(self.admin.env.routes_dir, replay.group(1))
+                except FileNotFoundError:
+                    self.send_error(404, 'No such route')
+                    return
+                try:
+                    csv_name = build_replay(route, self.admin.env.routes_dir / route.file, self.admin.env.record_dir)
+                except NotEnoughData as exc:
+                    self.send_error(409, f'Datos insuficientes: {exc}')
+                    return
+                self.respond({'replayFile': csv_name})
+                return
+            if path == '/routes/rename' and self.admin is not None:
+                from coach.app.routes_store import rename
+                body = self.read_json()
+                try:
+                    self.respond(rename(self.admin.env.routes_dir, body.get('file'), body.get('name')))
+                except FileNotFoundError:
+                    self.send_error(404, 'No such route')
+                return
             if path == '/routes/generate' and self.admin is not None:
                 from coach.app.routes_store import generate
                 self.respond(generate(self.admin.env.routes_dir, self.read_json()))
@@ -591,6 +649,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_DELETE(self):
         path = self.route()
+        if self.admin is not None and (path.startswith('/routes/') or path.startswith('/sessions/')):
+            self.delete_file(path)
+            return
         prefix = '/devices/'
         role = path[len(prefix):] if path.startswith(prefix) else None
         registry = self.state.registry
@@ -600,6 +661,38 @@ class Handler(BaseHTTPRequestHandler):
         address = (parse_qs(urlsplit(self.path).query).get('address') or [None])[0]
         registry.forget(role, address)  # one device (?address=…) or every device of the role
         self.respond({'forgotten': role, 'address': address, **self.devices_json()})
+
+
+def _delete_file(self, path):
+    """DELETE /routes/<file> or /sessions/<session>: to the trash (routes_store.TRASH), never what is in use."""
+    from coach.app.routes_store import delete_route
+    from coach.session.session import delete_session
+    state, env = self.state, self.admin.env
+    try:
+        if path.startswith('/routes/'):
+            file = path[len('/routes/'):]
+            ride = state.ride
+            if ride is not None and ride.route is not None and ride.route.file == file and not ride.route_finished:
+                self.send_error(409, 'You are riding this route: leave it first')
+                return
+            self.respond(delete_route(env.routes_dir, file))
+            return
+        stem = path[len('/sessions/'):]
+        session = self.session
+        if session is not None and session.snapshot().get('session') == stem:
+            self.send_error(409, 'This session is being recorded: finish it first')
+            return
+        if state.mode == 'REPLAY' and state.replay is not None and state.replay.filename.stem == stem:
+            self.send_error(409, 'This session is open in the replay: leave the replay first')
+            return
+        result = delete_session(env.record_dir, stem)
+        self.history_store().delete(f'app:{stem}')          # it no longer counts in the history and the load
+        self.respond(result)
+    except FileNotFoundError:
+        self.send_error(404, 'Not found')
+
+
+Handler.delete_file = _delete_file
 
 
 def make_server(host: str, port: int, runtime) -> ThreadingHTTPServer:

@@ -46,9 +46,14 @@ export function TraceChart({ points, field, color, unit, current, duration, full
         {[0.25, 0.5, 0.75].map((f) => (
           <line key={f} x1={padX} x2={W - padX} y1={(H - axis) * f} y2={(H - axis) * f} stroke="#2c4745" strokeDasharray="4 6" />
         ))}
-        {timeTicks(span).map(([t, label]) => (
+        {timeTicks(span, 6).map(([t, label]) => (
           <text key={t} x={x(t)} y={H - 2} fontSize="10" textAnchor={anchor(x(t))} fill="#7f9a94">{label}</text>
         ))}
+        {!shown && !fullView && (
+          <text x={W / 2} y={(H - axis) / 2} fontSize="13" textAnchor="middle" fill="#8aa99e">
+            Se dibuja al reproducir · «Análisis completo» la muestra entera
+          </text>
+        )}
         {targetPath && <path d={targetPath} fill="none" stroke="#e8f1ee" strokeOpacity=".7" strokeWidth="1.6" strokeDasharray="6 4" />}
         <path d={d} fill="none" stroke={color} strokeWidth="2.3" strokeLinejoin="round" />
         <line x1={pointer} x2={pointer} y1="0" y2={H - axis} stroke="#e0e8d8" strokeWidth="1.5" strokeDasharray="5 4" />

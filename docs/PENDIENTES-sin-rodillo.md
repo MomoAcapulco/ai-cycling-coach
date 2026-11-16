@@ -15,7 +15,8 @@ Lo que se puede hacer y probar sin el rodillo, en orden. Lo que necesita el rodi
 | 7 | **Forma, fatiga y frescura** (CTL, ATL y TSB) con el historial de sesiones | Hecho (15-11), validado con el «Esfuerzo relativo» de Strava; mejora si pones tu pulso en reposo y tu umbral en el perfil |
 | 8 | **Método del desnivel acumulado de las rutas**: decidirlo con GPX reales frente al desnivel oficial | Hecho (15-11): media de 50 m, a menos del 1 % de Strava en tus 3 rutas (abajo) |
 | 9 | **Rutas generadas**: crear rutas a partir de distancia, desnivel, número de subidas… (abajo) | Hecho (16-11): «a medida» y «como mi carrera», probado con tus 5 GPX; falta rodar una con el rodillo |
-| 10 | **Lo que necesita la IA además de 4–7**: tu objetivo y calendario, tus salidas en la calle, cómo te sientes, historial consultable, reglas y privacidad (abajo) | **10a hecha (15-11)**: historial + importación de Strava (118 actividades). Faltan objetivo y calendario, sensaciones, reglas |
+| 10 | **Lo que necesita la IA además de 4–7**: tu objetivo y calendario, tus salidas en la calle, cómo te sientes, historial consultable, reglas y privacidad (abajo) | **10a hecha (15-11)**: historial + importación de Strava (118 actividades). **Sensaciones hechas (16-11)**: esfuerzo 1–10 y nota por sesión. Faltan objetivo y calendario, reglas |
+| 10c | **Base de datos SQLite** para lo que hoy son JSON sueltos (resúmenes de sesión, esfuerzo, entrenamientos, nombres de rutas, perfil, ajustes), migrando tus datos sin perder nada; las series (CSV) y los GPX siguen como ficheros (abajo) | Pendiente; antes de la 11 |
 | 11 | **IA, fase 1: análisis después de cada sesión** | Tras la 4, la 5 y parte de la 10 |
 | 12 | **IA, fase 2: planificación** (semana, ajustes según cómo vas, puesta a punto para la carrera) | Tras la 6, la 7 y la 10 |
 | 13 | **Visual 1: mapa en movimiento** con tu posición en la ruta | Pendiente |
@@ -141,6 +142,79 @@ Configuración propuesta (todo opcional menos la distancia):
    - La IA propone y el código valida (límites según tu FTP, rampas máximas), y nunca controla el rodillo
      directamente.
    - Son datos de salud: si se usa un modelo en la nube, tú decides qué se envía.
+
+## 10c. Base de datos (SQLite)
+
+Hoy: el historial ya está en SQLite (`history.db`); el resto son JSON sueltos (un resumen por sesión, perfil, ajustes,
+`routes/names.json`, `devices.json`).
+
+- **SQLite, no NoSQL**: un solo fichero, sin servidor ni instalación, se copia como cualquier fichero, aguanta un
+  corte de luz a mitad de escritura, y se consulta («mis sesiones de octubre con esfuerzo ≥ 7»), que es lo que
+  necesitará la IA. Lo que da NoSQL (documentos de forma libre) lo cubren las columnas JSON de SQLite; un servidor
+  tipo MongoDB solo añadiría instalación y mantenimiento para un único usuario.
+- **A la base de datos**: resúmenes de sesión, esfuerzo y notas, entrenamientos y sus bloques, rutas (nombre,
+  generada, veces rodada), perfil y ajustes.
+- **Se quedan como ficheros**: las series segundo a segundo (CSV), los GPX y los FIT: grandes, se escriben una vez y
+  conviene poder abrirlos con cualquier programa (como hacen Strava o GoldenCheetah). Y `.env`/`devices.json`, que
+  son configuración de arranque.
+- **Migración**: al arrancar, si hay JSON sin migrar, se pasan a la base de datos sin borrarlos (copia de seguridad
+  en una carpeta aparte), con tests que comparan antes y después.
+
+### 10d. Cada uno con sus datos, y compartir para enseñar a la IA (decidido 16-11)
+
+Sigue siendo **SQLite**: no es una base de datos distribuida, sino muchas instalaciones locales y, de vez en cuando,
+alguien que envía una copia. Nada se sincroniza.
+
+- **Preparar ya, con la migración de 10c**:
+  - **Identificadores únicos (UUID)** en sesiones, rutas y entrenamientos, en vez de 1, 2, 3, que chocarían entre usuarios.
+    Así, una sesión enviada dos veces no se duplica.
+  - **Versión del esquema** guardada en la base de datos (`schema_version`), para leer bien los datos de una versión antigua.
+- **Compartir = un paquete, no una base de datos**: un `.zip` con
+  - `manifest.json` (versión del esquema, versión de la app, fecha, qué categorías van y cuántas sesiones);
+  - las sesiones en Parquet o CSV.
+- **En tu lado**: una carpeta de paquetes y **DuckDB**, que consulta todos los Parquet a la vez.
+  PostgreSQL solo si algún día hay un servidor que reciba los envíos automáticamente.
+
+**El GPS no se comparte nunca.** A la IA le sirven la distancia, la altitud y la pendiente, no dónde estás.
+- El GPS solo hace falta **en local**: la distancia entre puntos sale de las coordenadas, y la altitud del GPX/FIT
+  da el desnivel y la pendiente.
+- Las series de la app ya llevan `rideDistanceKm`, `altitudeM` y `roadGradePercent`, así que el paquete se hace
+  con eso y sin `lat`/`lon`.
+- Las rutas se comparten como **perfil** (distancia → altitud cada 10 m), sin coordenadas.
+- Ojo: la salida y la llegada suelen ser tu casa. Por eso no hay coordenadas ni recortadas.
+
+**Pantalla «Compartir mis datos»** (Ajustes), solo si el usuario la abre:
+1. **Explicación y consentimiento explícito**: para qué es, qué se envía, que el pulso es un dato de salud y que
+   se puede pedir el borrado.
+2. **Qué se comparte, por categorías** (casillas; las marcadas por defecto, entre paréntesis):
+   - sesiones del rodillo: potencia, cadencia, velocidad, pendiente y marchas (sí);
+   - pulso (sí);
+   - salidas en la calle importadas, sin GPS (sí);
+   - esfuerzo percibido 1–10 (sí);
+   - **notas de texto (no)**: la gente escribe cosas personales;
+   - entrenamientos y tests de FTP (sí);
+   - perfil **por rangos**: peso de 10 en 10 kg, edad por décadas, FTP de 20 en 20 W, sexo si quiere (sí);
+   - perfiles de las rutas, sin coordenadas (sí).
+3. **Vista previa**: cuántas sesiones, qué fechas y un ejemplo de las filas tal como se enviarán.
+4. **Mínimo de datos**, contado solo con lo que haya marcado. Propuesta:
+   - al menos **10 sesiones de 20 minutos o más**, con potencia o con pulso;
+   - repartidas en **4 semanas o más**;
+   - con potencia o pulso en al menos el 80 % de cada sesión.
+   Si no llega: «¡Gracias! De momento son pocos datos para que la IA aprenda algo (te faltan 4 sesiones de 20 min).
+   Te avisamos cuando tengas suficientes.» El paquete no se genera, y el aviso es opcional y se puede apagar.
+5. **Generar el paquete** en la carpeta de datos. Lo **envía el usuario** (correo o subida): la app no manda nada sola.
+
+**Anonimización** (y un test que lo comprueba con `mask_personal_data.py`):
+- **Donante**: un identificador aleatorio que se crea al compartir por primera vez, sin nombre ni correo. Con él se
+  puede pedir el borrado.
+- **Tiempo**: segundos desde el inicio de cada sesión; la fecha, como mucho la semana (`2026-W46`), para la carga
+  CTL/ATL.
+- **Fuera**: GPS; identificadores BLE, seriales y nombres de dispositivos; nombres de los ficheros; nombres de las
+  rutas (pueden decir dónde vives); el texto del log del rodillo; el peso que va en la respuesta 512.
+- **Dispositivos**, solo por tipo: «rodillo con Zwift Cog» o «banda de pulso».
+- **RGPD**: el pulso es un dato de salud y, mientras se pueda pedir el borrado, el paquete está seudonimizado, no
+  anonimizado. Así que hacen falta el consentimiento explícito, un texto de para qué se usa y una forma de borrar
+  (un correo con el identificador de donante basta al principio).
 
 ## 13–15. Parte visual (propia, sin copiar el mundo, los avatares ni el estilo de Zwift)
 

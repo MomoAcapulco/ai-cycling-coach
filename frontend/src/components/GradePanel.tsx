@@ -82,7 +82,15 @@ export function GradePanel({ data, onError }: { data: Telemetry | null; onError:
   return (
     <article className="panel control-panel">
       <div className="panel-heading">
-        <h2>Pendiente</h2>
+        <h2>Pendiente <Help title="Cómo funciona la pendiente">
+      <p>
+        Como en una carretera de verdad, la pendiente cambia según avanzas: 1 % cada {fmt(data?.gradeTransitionMetersPerPercent, 0)} m
+        (parado no cambia). {onTrainer && `El rodillo aplica la dificultad ${data?.gradeDifficultyPercent ?? '—'} % (bajadas ×${data?.gradeDescentFactorPercent ?? '—'} %), entre ${pct(data?.gradeMinPercent)} y ${pct(data?.gradeMaxPercent)}.`} Se cambia en Ajustes → Perfil.
+      </p>
+      {onTrainer
+        ? <p>«Aplicada ✓» es la pendiente que el rodillo confirma tener puesta (lo pregunta tras cada cambio).</p>
+        : <p>En el simulador solo cambia la carretera virtual (velocidad, distancia, desnivel), para probarlo sin rodillo.</p>}
+      </Help></h2>
         <span className={onTrainer ? 'live-tag' : ''}>{onTrainer ? 'CONTROLA EL RODILLO' : 'SIMULADOR · SOLO LA CARRETERA'}</span>
       </div>
       <div className="gear-display">
@@ -125,15 +133,6 @@ export function GradePanel({ data, onError }: { data: Telemetry | null; onError:
         )}
       </div>
       {onTrainer && <p className="tiny">{GRADE_STATUS[data?.gradeStatus ?? ''] ?? data?.gradeStatus}</p>}
-      <Help>
-      <p>
-        Como en una carretera de verdad, la pendiente cambia según avanzas: 1 % cada {fmt(data?.gradeTransitionMetersPerPercent, 0)} m
-        (parado no cambia). {onTrainer && `El rodillo aplica la dificultad ${data?.gradeDifficultyPercent ?? '—'} % (bajadas ×${data?.gradeDescentFactorPercent ?? '—'} %), entre ${pct(data?.gradeMinPercent)} y ${pct(data?.gradeMaxPercent)}.`} Se cambia en Ajustes → Perfil.
-      </p>
-      {onTrainer
-        ? <p>«Aplicada ✓» es la pendiente que el rodillo confirma tener puesta (lo pregunta tras cada cambio).</p>
-        : <p>En el simulador solo cambia la carretera virtual (velocidad, distancia, desnivel), para probarlo sin rodillo.</p>}
-      </Help>
     </article>
   );
 }

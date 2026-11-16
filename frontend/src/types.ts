@@ -170,6 +170,8 @@ export type SessionSummary = {
   best20MinWattsPerKg?: number | null;
   estimatedFtpW?: number | null;
   workout?: SessionWorkout;
+  feedback?: SessionFeedback;
+  routes?: { file: string; name: string | null; km: number }[];
   files: string[];
 };
 
@@ -186,7 +188,11 @@ export type Sample = {
   altitude?: number | null;   // m
 };
 
-export type Session = { durationSeconds: number; gradeKind: string; samples: Sample[] };
+export type Session = { durationSeconds: number; gradeKind: string; samples: Sample[]; routes?: { file: string; name: string | null; km: number }[] };
+export type RouteRide = {
+  session: string; date: string | null; km: number | null; seconds: number; csv: string | null;
+  replayable: boolean; why: string | null; rpe: number | null;
+};
 
 export type Settings = {
   mode: Mode;
@@ -267,7 +273,14 @@ export type RouteSummary = {
   clippedSteps?: number;
   points?: number;
   thumb?: { d: number; e: number; g: number }[];
+  generated?: boolean;          // made in Rutas → Generar
+  recorded?: boolean;           // a recorded ride (times on its points): it has its own replay
+  gpxName?: string;             // the name inside the GPX (``name`` may be the rider's own)
+  rides?: number;               // sessions ridden on it
+  lastRide?: RouteRide | null;
+  replayRide?: RouteRide | null; // the newest session on it that has enough data to replay
 };
+export type SessionFeedback = { rpe: number | null; note: string | null; updatedUtc?: string };
 
 /** The route being ridden: summary plus the profile for the chart (d km, e m, g % of the next step). */
 export type ActiveRoute = { active: false } | (RouteSummary & {
@@ -278,6 +291,7 @@ export type ActivityType = 'ride' | 'virtual_ride' | 'run' | 'strength' | 'worko
 
 export type Activity = {
   id: string; source: 'app' | 'strava' | string; start_utc: string | null; type: ActivityType; name: string | null;
+  rpe?: number | null; feeling?: string | null;
   elapsed_s: number | null; moving_s: number | null; distance_m: number | null; ascent_m: number | null;
   avg_power: number | null; max_power: number | null; np: number | null; work_kj: number | null;
   avg_hr: number | null; max_hr: number | null; avg_cadence: number | null; has_power: number; has_hr: number;

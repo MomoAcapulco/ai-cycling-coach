@@ -5,6 +5,7 @@ import type { Sample, Telemetry } from '../types';
 import { Help } from './Help';
 import type { Route } from '../hooks';
 import { POWER_ZONES, powerZone } from '../zones';
+import { LIVE_LABEL, exitReplay, lastLiveMode } from '../liveMode';
 
 const MODE_LABEL: Record<string, string> = { SIMULATOR: 'SIMULADOR', WAHOO: 'RODILLO REAL', REPLAY: 'REPLAY · HISTÓRICO' };
 
@@ -150,6 +151,9 @@ export function ReplayPlayer({ data, duration, firstCommandAt, onError }: {
             {data?.replayPlaying ? '⏸ Pausar' : '▶ Reproducir'}
           </button>
           <button disabled={busy} onClick={() => void run('restart')}>↺ Reiniciar</button>
+          <button disabled={busy} title="Para entrenar, hacer el test de FTP o rodar una ruta"
+            onClick={() => { setBusy(true); exitReplay().then(() => onError('')).catch((e) => onError(`Salir del replay: ${e instanceof Error ? e.message : e}`)).finally(() => setBusy(false)); }}>
+            ⏏ Salir del replay (volver a {LIVE_LABEL[lastLiveMode()]})</button>
           {firstCommandAt != null && (
             <button disabled={busy} onClick={() => void run('seek', firstCommandAt)}>Ir a la primera orden ({clock(firstCommandAt)})</button>
           )}
@@ -157,6 +161,7 @@ export function ReplayPlayer({ data, duration, firstCommandAt, onError }: {
         <label>Velocidad
           <select disabled={busy} value={data?.replaySpeed ?? 1} onChange={(e) => void run('speed', Number(e.target.value))}>
             <option value={0.5}>0,5×</option><option value={1}>1×</option><option value={2}>2×</option><option value={4}>4×</option>
+            <option value={8}>8×</option><option value={16}>16×</option>
           </select>
         </label>
       </div>
@@ -195,7 +200,13 @@ export function GearPanel({ data, replay, onError }: { data: Telemetry | null; r
   return (
     <article className="panel control-panel">
       <div className="panel-heading">
-        <h2>Marchas virtuales</h2>
+        <h2>Marchas virtuales <Help title="Cómo funcionan las marchas virtuales">
+        {onTrainer
+          ? <p>Mandos: «+» derecho endurece, «−» izquierdo suaviza. Al salir, el rodillo vuelve a la marcha 12.</p>
+          : <p>Relación relativa: {fmt(data?.virtualGearRelativeRatio, 2)}× (tabla de 24 marchas de Zwift).
+            {' '}{replay ? 'En replay las marchas son solo visuales.' : 'Para que muevan el rodillo, activa el control de marchas en Ajustes (modo rodillo real).'}</p>}
+        <p>Último botón: {data?.lastButton ?? 'ninguno'}</p>
+      </Help></h2>
         <span className={onTrainer ? 'live-tag' : ''}>{onTrainer ? 'CONTROLAN EL RODILLO' : 'SOLO VISUAL'}</span>
       </div>
       <div className="gear-display">
@@ -214,13 +225,6 @@ export function GearPanel({ data, replay, onError }: { data: Telemetry | null; r
           {data?.gearLastRefusal && <p className="tiny warn">Se rechazó endurecer: sin pedalear (o sin datos del rodillo) la marcha no sube.</p>}
         </>
       ) : null}
-      <Help>
-        {onTrainer
-          ? <p>Mandos: «+» derecho endurece, «−» izquierdo suaviza. Al salir, el rodillo vuelve a la marcha 12.</p>
-          : <p>Relación relativa: {fmt(data?.virtualGearRelativeRatio, 2)}× (tabla de 24 marchas de Zwift).
-            {' '}{replay ? 'En replay las marchas son solo visuales.' : 'Para que muevan el rodillo, activa el control de marchas en Ajustes (modo rodillo real).'}</p>}
-        <p>Último botón: {data?.lastButton ?? 'ninguno'}</p>
-      </Help>
     </article>
   );
 }
@@ -233,8 +237,8 @@ export function SessionStats({ data, points }: { data: Telemetry | null; points:
   return (
     <article className="panel stats">
       <h2>{replay ? 'Sesión grabada' : 'Esta sesión'}</h2>
-      <div><span>Distancia</span><strong>{fmt(replay ? data?.estimatedDistanceKm : data?.sessionDistanceKm, 2)} km</strong></div>
-      <div><span>Desnivel acumulado</span><strong>{fmt(replay ? null : data?.sessionElevationGainM, 0)} m</strong></div>
+      <div><span>Distancia</span><strong>{fmt(replay ? data?.rideDistanceKm ?? data?.estimatedDistanceKm : data?.sessionDistanceKm, 2)} km</strong></div>
+      <div><span>Desnivel acumulado</span><strong>{fmt(replay ? data?.elevationGainM : data?.sessionElevationGainM, 0)} m</strong></div>
       <div><span>Trabajo mecánico</span><strong>{fmt(replay ? data?.mechanicalWorkKj : data?.sessionWorkKj, 1)} kJ</strong></div>
       <div><span>Pendiente máxima</span><strong>{fmt(maxGrade, 1)} %</strong></div>
       <div><span>Fuente</span><strong>{data?.source ?? '—'}</strong></div>

@@ -25,7 +25,11 @@ export function RampTestPanel({ data, power3s, onError }: { data: Telemetry | nu
   return (
     <article className="panel control-panel ramp-panel">
       <div className="panel-heading">
-        <h2>Test de FTP</h2>
+        <h2>Test de FTP <Help title="Cómo funciona el test de FTP">
+            <p>5 minutos suaves y después un objetivo que sube 20 W cada minuto, empezando en
+              {' '}{data?.workoutStartW ?? 'unos 100'} W. Lo alcanzas tú subiendo de marcha, y aguantas hasta que no puedas más: al dejar de
+              pedalear termina solo. Tu FTP es el 75 % de tu mejor minuto.</p>
+          </Help></h2>
         <span className={phase === 'RAMP' || phase === 'WARMUP' ? 'live-tag' : ''}>
           {phase === 'WARMUP' ? 'CALENTAMIENTO' : phase === 'RAMP' ? 'RAMPA' : phase === 'DONE' ? 'TERMINADO' : 'RAMPA · SIN ERG'}
         </span>
@@ -34,11 +38,6 @@ export function RampTestPanel({ data, power3s, onError }: { data: Telemetry | nu
       {!phase && (
         <>
           <p className="tiny">Rampa hasta no poder más, 15–25 minutos: te da tu FTP.</p>
-          <Help>
-            <p>5 minutos suaves y después un objetivo que sube 20 W cada minuto, empezando en
-              {' '}{data?.workoutStartW ?? 'unos 100'} W. Lo alcanzas tú subiendo de marcha, y aguantas hasta que no puedas más: al dejar de
-              pedalear termina solo. Tu FTP es el 75 % de tu mejor minuto.</p>
-          </Help>
           <p className="tiny warn">Esfuerzo máximo: hazlo descansado y para si notas mareo, dolor en el pecho o algo raro.</p>
           <button className="primary" disabled={busy} onClick={() => void run(() => api.startRampTest(), () => setSaved(null))}>Empezar test de FTP</button>
         </>
