@@ -27,15 +27,17 @@ RIDE_TICK_SECONDS = 0.25
 
 
 def workout_ticker(state, test, stop, tick=1.0):
-    """Feeds the FTP test with the 1 Hz telemetry until it ends (or the configuration changes)."""
+    """Feeds a workout (FTP test or structured) with the 1 Hz telemetry until it ends (or the configuration changes)."""
     from coach.app.server import current_reading
     while not stop.wait(tick):
-        if state.workout is not test or test.phase not in ('WARMUP', 'RAMP'):
+        if state.workout is not test or not test.running:
             return
         try:
-            test.tick(current_reading(state))
-        except Exception as exc:  # the test must never take the adapter down
-            print(f'WARNING: FTP test tick failed: {exc}', flush=True)
+            reading = current_reading(state)
+            reading['sessionState'] = state.session_state() if state.session_state is not None else 'RUNNING'
+            test.tick(reading)
+        except Exception as exc:  # the workout must never take the adapter down
+            print(f'WARNING: workout tick failed: {exc}', flush=True)
 
 
 def ride_ticker(state, stop, tick=RIDE_TICK_SECONDS, clock=None):
@@ -162,35 +164,84 @@ class AdapterRuntime:
             from coach.devices.grade_controller import GradePrefs
             state.grade.set_prefs(GradePrefs.from_profile(profile))
 
-    # ---- FTP test (coach/workouts/ramp_test.py) ----
+    # ---- workouts: FTP test (coach/workouts/ramp_test.py) and structured (coach/workouts/structured.py) ----
+    def _can_start_workout(self):
+        state = self.state
+        if state.mode == 'REPLAY':
+            raise PermissionError('Workouts need the trainer or the simulator, not REPLAY')
+        if state.workout is not None and state.workout.running:
+            raise PermissionError('A workout is already running')
+        if state.ride is not None and state.ride.route is not None and not state.ride.route_finished:
+            raise PermissionError('Leave the route first: workouts are ridden on the flat')
+
+    def _run_workout(self, workout):
+        """Show it, feed it, and record it in a session (one is started if none is running)."""
+        state = self.state
+        if self.session is not None and self.session.snapshot()['sessionState'] == 'IDLE':
+            self.session.start()
+        state.workout = workout
+        stop = self._stop
+        if self.start_workers and stop is not None:
+            Thread(target=workout_ticker, args=(state, workout, stop), daemon=True, name='workout').start()
+        return workout.snapshot()
+
+    def workout_ftp(self):
+        """(FTP, source) for the workout targets: the profile's, else the one estimated from the history."""
+        ftp = self._ftp()
+        if ftp:
+            return ftp, 'profile'
+        try:
+            from coach.history.load import derive_params
+            from coach.history.store import HistoryStore
+            store = HistoryStore(self.env.history_db) if self.env.history_db else HistoryStore.default()
+            profile = self.profile_store.load()[0] if self.profile_store is not None else None
+            params = derive_params(profile, store.list(100000))
+            if params.ftp:
+                return params.ftp, params.ftp_source or 'history'
+        except Exception as exc:  # no history: no estimate
+            print(f'WARNING: no FTP estimate from the history: {exc}', flush=True)
+        return None, None
+
+    def workout_library(self):
+        from coach.workouts.structured import LIBRARY
+        ftp, source = self.workout_ftp()
+        return {'ftpW': ftp, 'ftpSource': source, 'workouts': [w.to_json(ftp) for w in LIBRARY.values()]}
+
+    def start_structured(self, options: dict):
+        from coach.workouts.structured import LIBRARY, StructuredWorkout
+        self._can_start_workout()
+        definition = LIBRARY.get(options.get('id'))
+        if definition is None:
+            raise ValueError(f'id must be one of: {", ".join(LIBRARY)}')
+        ftp, source = self.workout_ftp()
+        if not ftp:
+            raise PermissionError('The targets need an FTP: do the FTP test or enter it in Ajustes')
+        return self._run_workout(StructuredWorkout(definition, ftp, source))
+
+    def workout_summary(self) -> dict:
+        """For the session summary: the workout ridden in it (ended first if it was still running)."""
+        workout = self.state.workout if self.state is not None else None
+        if workout is None:
+            return {}
+        if workout.running:
+            workout.finish('session finished')
+        return {'workout': workout.summary()}
+
     def start_ramp_test(self, options: dict):
         """Start the ramp FTP test (and a session to record it, if none is running)."""
         from coach.workouts.ramp_test import RampTest
-        state = self.state
-        if state.mode == 'REPLAY':
-            raise PermissionError('The FTP test needs the trainer or the simulator, not REPLAY')
-        if state.workout is not None and state.workout.phase in ('WARMUP', 'RAMP'):
-            raise PermissionError('A test is already running')
-        if state.ride is not None and state.ride.route is not None and not state.ride.route_finished:
-            raise PermissionError('Leave the route first: the test is ridden on the flat')
+        self._can_start_workout()
         ftp = self._ftp()
         start_w = options.get('startW', max(50, int(round(ftp * 0.4 / 10) * 10)) if ftp else 100)
         step_w = options.get('stepW', 20)
         for name, value, low, high in (('startW', start_w, 50, 300), ('stepW', step_w, 10, 40)):
             if type(value) is not int or not low <= value <= high:
                 raise ValueError(f'{name} must be a whole number between {low} and {high}')
-        if self.session is not None and self.session.snapshot()['sessionState'] == 'IDLE':
-            self.session.start()
-        test = RampTest(start_w=start_w, step_w=step_w)
-        state.workout = test
-        stop = self._stop
-        if self.start_workers and stop is not None:
-            Thread(target=workout_ticker, args=(state, test, stop), daemon=True, name='ramp-test').start()
-        return test.snapshot()
+        return self._run_workout(RampTest(start_w=start_w, step_w=step_w))
 
     def stop_workout(self):
         if self.state.workout is None:
-            raise PermissionError('No test is running')
+            raise PermissionError('No workout is running')
         self.state.workout.finish('rider finished')
         return self.state.workout.snapshot()
 
@@ -205,8 +256,8 @@ class AdapterRuntime:
         return {'ftpWatts': profile.ftp_watts}
 
     def clear_workout(self):
-        if self.state.workout is not None and self.state.workout.phase in ('WARMUP', 'RAMP'):
-            raise PermissionError('Stop the test first')
+        if self.state.workout is not None and self.state.workout.running:
+            raise PermissionError('Stop the workout first')
         self.state.workout = None
         return {'workout': None}
 
@@ -257,7 +308,8 @@ class AdapterRuntime:
             from coach.app.server import current_reading
             from coach.session.session import SessionManager
             self.session = SessionManager(lambda state=state: current_reading(state), self.env.record_dir,
-                                          ftp=self._ftp, capture=self._capture, rider_kg=self._rider_kg)
+                                          ftp=self._ftp, capture=self._capture, rider_kg=self._rider_kg,
+                                          extra=self.workout_summary)
             state.session_state = lambda session=self.session: session.state
         self.state = state  # one reference swap: HTTP handlers see the old or the new state, never a mix
         self.settings = settings

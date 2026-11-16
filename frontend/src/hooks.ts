@@ -44,7 +44,7 @@ export function useTelemetry() {
         if (inSession) lastSession.current = d.session ?? null;   // after «Terminar» it remembers the last one
         if (d.source !== 'REPLAY' && d.connected && d.sessionState === 'RUNNING') {
           const sample: Sample = {
-            t: Math.round(d.sessionElapsedSeconds ?? 0), power: d.powerWatts, heart: d.heartRateBpm, cadence: d.cadenceRpm,
+            t: Math.round(d.sessionElapsedSeconds ?? 0), power: d.powerWatts, target: d.targetPowerW ?? null, heart: d.heartRateBpm, cadence: d.cadenceRpm,
             speed: d.rideSpeedKph ?? d.speedKph, grade: d.roadGradePercent ?? d.targetGradePercent ?? null,
             effective: d.effectiveGradePercent ?? null, distance: d.rideDistanceKm ?? null, altitude: d.altitudeM ?? null,
           };
@@ -67,13 +67,13 @@ export function useTelemetry() {
   return { data, error, history };
 }
 
-export type Route = 'panel' | 'rutas' | 'sesiones' | 'historial' | 'ajustes';
+export type Route = 'panel' | 'entrenamientos' | 'rutas' | 'sesiones' | 'historial' | 'ajustes';
 
 /** Minimal hash router: #/rutas, #/sesiones, #/ajustes, anything else is the panel. */
 export function useRoute(): Route {
   const read = (): Route => {
     const page = window.location.hash.replace(/^#\/?/, '');
-    return page === 'ajustes' || page === 'sesiones' || page === 'rutas' || page === 'historial' ? page : 'panel';
+    return page === 'ajustes' || page === 'sesiones' || page === 'rutas' || page === 'historial' || page === 'entrenamientos' ? page : 'panel';
   };
   const [route, setRoute] = useState<Route>(read);
   useEffect(() => {

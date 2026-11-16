@@ -210,6 +210,19 @@ class TrainerControllerTest {
     }
 
     @Test
+    void structuredWorkoutsAreForwarded() throws Exception {
+        REPLIES.put("/workout/library", new Reply(200, "{\"ftpW\":200,\"workouts\":[{\"id\":\"vo2-5x4\"}]}"));
+        mvc.perform(get("/api/trainer/workout/library"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.workouts[0].id").value("vo2-5x4"));
+        REPLIES.put("/workout/structured/start", new Reply(200, "{\"workoutType\":\"STRUCTURED\"}"));
+        mvc.perform(post("/api/trainer/workout/structured/start").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"id\":\"vo2-5x4\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.workoutType").value("STRUCTURED"));
+    }
+
+    @Test
     void historyIsForwarded() throws Exception {
         REPLIES.put("/history/weeks", new Reply(200, "{\"weeks\":[{\"week\":\"2026-11-09\"}]}"));
         mvc.perform(get("/api/trainer/history/weeks"))

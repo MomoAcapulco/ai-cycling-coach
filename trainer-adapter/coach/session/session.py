@@ -20,7 +20,7 @@ from coach.session.recording import FIELDS
 SESSION_FIELDS = FIELDS + ['trainerGear', 'requestedGear', 'gearStatus', 'virtualGear',
                            'effectiveGradePercent', 'sentGradePercent', 'gradeStatus',
                            'roadGradePercent', 'rideSpeedKph', 'rideDistanceKm', 'altitudeM', 'elevationGainM',
-                           'vamMh', 'wattsPerKg', 'routeName', 'routeProgressKm']
+                           'vamMh', 'wattsPerKg', 'routeName', 'routeProgressKm', 'targetPowerW']
 MAX_SESSION_SECONDS = 4 * 3600
 SAMPLE_SECONDS = 1.0
 
@@ -33,8 +33,10 @@ class SessionManager:
     def __init__(self, reading: Callable[[], dict], folder: Path, ftp: Callable[[], Optional[int]] = lambda: None,
                  capture=None, clock=monotonic, now=lambda: datetime.now(timezone.utc),
                  max_seconds=MAX_SESSION_SECONDS, sample_seconds=SAMPLE_SECONDS,
-                 rider_kg: Callable[[], Optional[float]] = lambda: None):
+                 rider_kg: Callable[[], Optional[float]] = lambda: None,
+                 extra: Callable[[], dict] = lambda: {}):
         self.reading, self.folder, self.ftp, self.capture = reading, Path(folder), ftp, capture
+        self.extra = extra          # more for the summary at the end (the workout ridden and how it went)
         self.rider_kg = rider_kg
         self.clock, self.now, self.max_seconds, self.sample_seconds = clock, now, max_seconds, sample_seconds
         self.lock = Lock()
@@ -103,6 +105,10 @@ class SessionManager:
                        'csv': f'{self.stem}.csv',
                        'rawCapture': f'{self.stem}_ble_raw.jsonl' if self.capture is not None else None,
                        **self.metrics.summary(self.ftp(), self.rider_kg())}
+            try:
+                summary.update(self.extra() or {})
+            except Exception as exc:  # the summary must be written whatever happens
+                print(f'WARNING: session summary extra failed: {exc}', flush=True)
             (self.folder / f'{self.stem}.json').write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding='utf-8')
             self.last_summary = summary
             return summary

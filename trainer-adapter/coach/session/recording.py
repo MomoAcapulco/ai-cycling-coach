@@ -194,6 +194,7 @@ class CsvReplay:
             samples.append({
                 't': t,
                 'power': _numeric(row.get('powerWatts'), float, None),
+                'target': _numeric(row.get('targetPowerW'), float, None),   # a workout's target (newer sessions)
                 'heart': _numeric(row.get('heartRateBpm'), float, None),
                 'cadence': _numeric(row.get('cadenceRpm'), float, None),
                 'speed': ride_speed if ride_speed is not None else _numeric(row.get('speedKph'), float, None),

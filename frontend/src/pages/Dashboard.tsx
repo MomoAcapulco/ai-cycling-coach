@@ -5,6 +5,7 @@ import type { ActiveRoute, Sample, Session, Telemetry } from '../types';
 import { ElevationProfile, GradeProfile, RouteProfile, TraceChart } from '../components/Charts';
 import { GradePanel } from '../components/GradePanel';
 import { RampTestPanel } from '../components/RampTestPanel';
+import { WorkoutPanel } from '../components/WorkoutPanel';
 import { GearPanel, Metrics, ReplayPlayer, SessionStats, StatusBar } from '../components/Panels';
 import { SessionBar } from '../components/SessionBar';
 
@@ -89,6 +90,7 @@ export function Dashboard({ data, error, history }: { data: Telemetry | null; er
       {!replay && <SessionBar data={data} onError={setActionError} />}
       <Metrics data={data} power3s={power3s} idle={idle} />
       {replay && <ReplayPlayer data={data} duration={duration} firstCommandAt={firstCommandAt} onError={setActionError} />}
+      {data?.workoutType === 'STRUCTURED' && <WorkoutPanel data={data} power3s={power3s} onError={setActionError} />}
       {route?.active && (
         <section className="panel">
           <RouteProfile profile={route.profile} progressKm={data?.routeProgressKm ?? route.progressKm}
@@ -133,7 +135,7 @@ export function Dashboard({ data, error, history }: { data: Telemetry | null; er
         <section className="right">
           <GearPanel data={data} replay={replay} onError={setActionError} />
           {(data?.gradeControlMode === 'TRAINER' || data?.gradeControlMode === 'SIMULATED') && <GradePanel data={data} onError={setActionError} />}
-          {!replay && <RampTestPanel data={data} power3s={power3s} onError={setActionError} />}
+          {!replay && data?.workoutType !== 'STRUCTURED' && <RampTestPanel data={data} power3s={power3s} onError={setActionError} />}
           <SessionStats data={data} points={points} />
         </section>
       </div>

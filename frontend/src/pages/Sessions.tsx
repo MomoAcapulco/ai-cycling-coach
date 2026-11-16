@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, sessionFileUrl } from '../api';
 import { clock, fmt } from '../format';
-import type { LoadReport, SessionSummary } from '../types';
+import type { LoadReport, SessionSummary, SessionWorkout } from '../types';
 
 const EFFORTS: [string, string][] = [['5', '5 s'], ['60', '1 min'], ['300', '5 min'], ['1200', '20 min']];
 
@@ -20,6 +20,29 @@ function GearBars({ seconds }: { seconds: Record<string, number> }) {
       </div>
       <span className="tiny">1 · 12 · 24</span>
     </div>
+  );
+}
+
+/** The workout ridden in the session: how it went, block by block (folded). */
+function WorkoutResult({ w }: { w: SessionWorkout }) {
+  if (w.type === 'RAMP_TEST') {
+    return <p className="workout-line">Test de FTP: {w.ftpW ? <strong>{w.ftpW} W</strong> : 'sin resultado'} · mejor minuto {fmt(w.best60sW, 0)} W</p>;
+  }
+  const work = (w.blocks ?? []).filter((b) => b.kind === 'WORK');
+  return (
+    <details className="workout-line">
+      <summary>Entrenamiento: <strong>{w.name}</strong> · hecho {w.completedPct ?? '—'} % · cumplimiento {w.workCompliancePct ?? '—'} %
+        · en rango {w.workInRangePct ?? '—'} % (FTP {w.ftpW} W)</summary>
+      <table className="devices">
+        <thead><tr><th>Bloque</th><th>Tiempo</th><th>Objetivo</th><th>Media</th><th>Cumplimiento</th><th>En rango</th></tr></thead>
+        <tbody>
+          {work.map((b, i) => (
+            <tr key={i}><td>{b.name}</td><td>{clock(b.seconds)}</td><td>{b.targetW} W</td><td>{b.avgW} W</td>
+              <td>{b.compliancePct ?? '—'} %</td><td>{b.inRangePct} %</td></tr>
+          ))}
+        </tbody>
+      </table>
+    </details>
   );
 }
 
@@ -96,6 +119,7 @@ export function Sessions() {
             <div><span>W/kg medio</span><strong>{fmt(s.avgWattsPerKg, 2)}</strong></div>
             <div><span>FTP de esta sesión</span><strong>{s.estimatedFtpW == null ? 'necesita 20 min' : `${fmt(s.estimatedFtpW, 0)} W · ${fmt(s.best20MinWattsPerKg != null ? s.best20MinWattsPerKg * 0.95 : null, 2)} W/kg`}</strong></div>
           </div>
+          {s.workout && <WorkoutResult w={s.workout} />}
           {s.bestEffortsW && (
             <p className="tiny">Mejores esfuerzos: {EFFORTS.map(([k, label]) => `${label} ${s.bestEffortsW?.[k] == null ? '—' : `${fmt(s.bestEffortsW[k], 0)} W`}`).join(' · ')}</p>
           )}

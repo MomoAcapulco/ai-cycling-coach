@@ -157,14 +157,16 @@ def trainer_reading(state: 'AdapterState') -> dict:
         if state.session_state is not None and state.session_state() != 'RUNNING':
             reading.update(powerWatts=0, cadenceRpm=0, speedKph=0.0)   # the simulated rider waits, sat on the bike
         workout = state.workout
-        if workout is not None and workout.phase in ('WARMUP', 'RAMP'):
+        idle = state.session_state is not None and state.session_state() != 'RUNNING'
+        if workout is not None and workout.running and not idle:
             # a simulated rider for trying the FTP test without a trainer: easy warm-up, follows the target up
             # to SIMULATED_RIDER_LIMIT_W, then gives up (stops pedalling)
             target = workout.target_w()
             if target is None:
                 reading.update(powerWatts=120, cadenceRpm=85)
             elif target <= SIMULATED_RIDER_LIMIT_W:
-                reading.update(powerWatts=target, cadenceRpm=85)
+                block = workout.block() if hasattr(workout, 'block') else None   # a structured workout's cadence
+                reading.update(powerWatts=target, cadenceRpm=getattr(block, 'cadence', None) or 85)
             else:
                 reading.update(powerWatts=0, cadenceRpm=0)
         return reading
@@ -192,7 +194,7 @@ def current_reading(state: 'AdapterState') -> dict:
     if state.grade is not None:
         reading.update(state.grade.snapshot())  # gradeControlMode TRAINER, effective/sent grade
     if state.workout is not None:
-        reading.update(state.workout.snapshot())  # FTP test: phase, target, step, best minute, result
+        reading.update(state.workout.snapshot())  # the workout: phase, target, block / step, results
     reading['mode'] = state.mode
     return reading
 
@@ -261,6 +263,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path in ('/history', '/history/weeks') and self.admin is not None:
             self.respond(self.history_json(path.endswith('/weeks')))
+            return
+        if path == '/workout/library' and self.admin is not None:
+            self.respond(self.admin.workout_library())
             return
         if path == '/history/load' and self.admin is not None:
             self.respond(self.load_json())
@@ -449,10 +454,11 @@ class Handler(BaseHTTPRequestHandler):
                 name = (parse_qs(urlsplit(self.path).query).get('name') or [''])[0]
                 self.respond(save_route(self.admin.env.routes_dir, name, self.read_body(MAX_GPX)), 201)
                 return
-            if path in ('/workout/ramp/start', '/workout/stop', '/workout/ftp/save', '/workout/clear') \
-                    and self.admin is not None:
-                body = self.read_json() if path == '/workout/ramp/start' and int(self.headers.get('Content-Length', '0')) else {}
+            if path in ('/workout/ramp/start', '/workout/structured/start', '/workout/stop', '/workout/ftp/save',
+                        '/workout/clear') and self.admin is not None:
+                body = self.read_json() if path.endswith('/start') and int(self.headers.get('Content-Length', '0')) else {}
                 action = {'/workout/ramp/start': lambda: self.admin.start_ramp_test(body),
+                          '/workout/structured/start': lambda: self.admin.start_structured(body),
                           '/workout/stop': self.admin.stop_workout, '/workout/ftp/save': self.admin.save_test_ftp,
                           '/workout/clear': self.admin.clear_workout}[path]
                 self.respond(action())

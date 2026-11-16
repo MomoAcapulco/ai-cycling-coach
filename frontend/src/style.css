@@ -113,3 +113,17 @@ h1{font-size:clamp(24px,2.6vw,32px);letter-spacing:-.025em;margin:4px 0 8px}
 .gear-bars>div{display:grid;grid-template-columns:repeat(24,1fr);gap:2px;align-items:end;height:34px;width:min(360px,60%)}
 .gear-bars i{display:block;background:#81d8b2;border-radius:2px 2px 0 0}
 a.button-link.primary{background:#267659;border-color:#63d5a1;color:#fff;font-weight:700}
+/* v4.3: structured workouts */
+.workout-blocks{display:block;width:100%;margin:8px 0}
+.workout-panel{margin:14px 0}
+.workout-now{display:grid;grid-template-columns:1.2fr 1.2fr 1fr;gap:10px;margin:14px 0 6px}
+.workout-now>div{border:1px solid #284541;border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:2px}
+.workout-now span{font-size:11px;color:#91a8a4;letter-spacing:.08em}
+.workout-now strong{font-size:44px;font-variant-numeric:tabular-nums;line-height:1.1}.workout-now strong small{font-size:16px;font-weight:400}
+.workout-now em{font-style:normal;font-size:12px;color:#b9cfc7;min-height:16px}
+.workout-target{border-width:2px!important}
+.workout-power.ok strong{color:#7fe7b0}.workout-power.low strong,.workout-power.high strong{color:#f3b77f}
+.workout-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:8px}
+.ok-text{color:#7fe7b0}.warn-text{color:#f3b77f}
+@media(max-width:800px){.workout-now{grid-template-columns:1fr 1fr}.workout-now strong{font-size:34px}}
+.workout-line{font-size:13px;color:#cfe3dc;margin:6px 0 10px}.workout-line summary{cursor:pointer}

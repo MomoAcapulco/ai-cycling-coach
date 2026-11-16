@@ -75,6 +75,16 @@ Historial de versiones (lo que antes estaba en un README por versión). La más 
   - Al iniciar una sesión nueva, las gráficas, el perfil del recorrido y la pendiente máxima **empiezan de cero**, con el tiempo de la sesión. Antes arrastraban todo lo anterior. Al terminar, la última sesión se queda en pantalla hasta empezar otra.
   - Botones ±0,5 % de la pendiente: varias pulsaciones seguidas solo contaban una por segundo, porque cada pulsación sumaba a la última lectura de telemetría y el botón se bloqueaba mientras se enviaba. Ahora cada pulsación suma al instante y se envía una sola vez, 0,3 s después de la última, con el total. El deslizador no tenía el problema.
   - Pulsómetro: si no se ve la banda, el Panel ya dice qué comprobar (que esté puesta y humedecida, y que no esté conectada a un reloj, al móvil o a Zwift) y la terminal lo escribe una vez. Antes solo ponía «WAITING».
+- **Entrenamientos estructurados sin ERG** (`coach/workouts/structured.py`, página **Entrenamientos**):
+  - Bloques (calentamiento, trabajo, recuperación, vuelta a la calma) con un objetivo de vatios en % de tu FTP, constante o en rampa, y una cadencia sugerida. Tú alcanzas el objetivo con las marchas: nunca se manda potencia al rodillo.
+  - FTP del perfil o, si no hay, el estimado con tu historial. Sin ninguno, la página pide hacer el test.
+  - Biblioteca pensada para maratones de BTT: recuperación activa, tempo 2×20, sweet spot 3×12, umbral 2×15, VO2 máx 5×4, subidas a baja cadencia 5×6 y cambios de ritmo 3×9. Cada uno con su duración, IF y TSS previstos y un gráfico de bloques coloreado por zonas.
+  - Panel: objetivo, potencia de 3 s (verde en el objetivo, naranja fuera de ±10 %), tiempo que queda del bloque, cadencia, el siguiente bloque y el entrenamiento entero con tu posición. La gráfica de potencia dibuja el objetivo en discontinua (también en replay).
+  - Empezar un entrenamiento inicia una sesión; «Pausar» la sesión pausa el entrenamiento; terminar la sesión lo termina.
+  - Cada bloque se puntúa: cumplimiento (potencia media frente al objetivo medio) y tiempo en rango (±10 %). Sin datos cuenta como 0 W.
+  - El resumen de la sesión guarda el entrenamiento y sus bloques (también el test de FTP); el CSV, el objetivo de cada segundo (`targetPowerW`). En Sesiones e Historial la sesión lleva el nombre del entrenamiento.
+  - API: `GET /workout/library`, `POST /workout/structured/start`; reenvío en la API Java.
+  - En el simulador, el ciclista simulado sigue el objetivo y la cadencia de cada bloque (hasta 260 W).
 - **Repaso visual de la interfaz** (capturas del 16-11):
   - Panel: barra de estado en español (Conectado, Buscando…) con el motivo en un ⓘ; no muestra el pulsómetro ni los mandos si están desactivados. Sin sesión no aparecen las estadísticas vacías. La tarjeta de pendiente ya no va resaltada y dice «llano · sin elegir» hasta que eliges una.
   - Gráficas: el perfil de altitud solo sale si hay desnivel (≥ 2 m), la de pendiente solo si cambia, y la de pulso solo si hay pulsómetro.

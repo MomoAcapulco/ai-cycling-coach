@@ -152,7 +152,7 @@ def app_session_row(summary: dict) -> dict:
     """A finished session of this app (its summary JSON) as a history row."""
     return {
         'id': f"app:{summary['session']}", 'source': 'app', 'start_utc': summary.get('startedAtUtc'),
-        'type': 'virtual_ride', 'name': 'Sesión en el rodillo',
+        'type': 'virtual_ride', 'name': (summary.get('workout') or {}).get('name') or 'Sesión en el rodillo',
         'elapsed_s': summary.get('elapsedSeconds'), 'moving_s': summary.get('movingSeconds'),
         'distance_m': (summary.get('distanceKm') or 0) * 1000, 'ascent_m': summary.get('elevationGainM'),
         'avg_power': summary.get('avgPowerW'), 'max_power': summary.get('maxPowerW'),

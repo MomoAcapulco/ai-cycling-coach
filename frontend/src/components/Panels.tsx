@@ -3,10 +3,11 @@ import { api } from '../api';
 import { clock, fmt } from '../format';
 import type { Sample, Telemetry } from '../types';
 import { Help } from './Help';
+import type { Route } from '../hooks';
 
 const MODE_LABEL: Record<string, string> = { SIMULATOR: 'SIMULADOR', WAHOO: 'RODILLO REAL', REPLAY: 'REPLAY · HISTÓRICO' };
 
-export function Header({ version, data, route }: { version: string; data: Telemetry | null; route: 'panel' | 'rutas' | 'sesiones' | 'historial' | 'ajustes' }) {
+export function Header({ version, data, route }: { version: string; data: Telemetry | null; route: Route }) {
   const mode = data?.mode ?? data?.source;
   return (
     <header>
@@ -16,6 +17,7 @@ export function Header({ version, data, route }: { version: string; data: Teleme
       </div>
       <nav className="nav">
         <a href="#/" className={route === 'panel' ? 'active' : ''}>Panel</a>
+        <a href="#/entrenamientos" className={route === 'entrenamientos' ? 'active' : ''}>Entrenamientos</a>
         <a href="#/rutas" className={route === 'rutas' ? 'active' : ''}>Rutas</a>
         <a href="#/sesiones" className={route === 'sesiones' ? 'active' : ''}>Sesiones</a>
         <a href="#/historial" className={route === 'historial' ? 'active' : ''}>Historial</a>

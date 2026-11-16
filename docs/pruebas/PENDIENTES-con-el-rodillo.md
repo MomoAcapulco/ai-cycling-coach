@@ -153,6 +153,22 @@ deja de pedalear: el test termina solo.
 - [ ] ¿Ha sido fácil seguir el objetivo con las marchas, o los saltos de 20 W eran incómodos con las marchas
   que tienes?
 
+## 7. Entrenamiento estructurado (unos 40–65 min; otro día, no el del test)
+
+Mejor **después del test de FTP**, para que los objetivos usen tu FTP real (si no, usa el estimado con tu historial).
+
+1. `./start.sh` → modo **Rodillo real** con control de marchas.
+2. **Entrenamientos** → elige uno. Para empezar, **Recuperación activa** (40 min, suave) o **Sweet spot 3×12**
+   (66 min) → **Empezar**. Se inicia la sesión sola y vas al Panel.
+3. Sigue el **objetivo** de cada bloque con las marchas y la cadencia que indica. Prueba una vez **Pausar** y
+   **Continuar** la sesión: el entrenamiento debe pararse y seguir donde estaba.
+4. Al acabar sale la tabla de cada bloque. **Cerrar** y **Terminar** la sesión. En **Sesiones** debe aparecer
+   con el nombre del entrenamiento y su cumplimiento.
+
+- [ ] Entrenamiento: ____________ · cumplimiento ____ % · en rango ____ %
+- [ ] ¿Se ve bien el objetivo desde la bici (tamaño, colores)? ¿Echas algo en falta mientras pedaleas?
+- [ ] ¿Los saltos de marcha permiten acercarse al objetivo (±10 %), o hay bloques imposibles de clavar?
+
 ## Qué me pasas al final
 
 - Todos los ficheros de `diagnostics/` nuevos.

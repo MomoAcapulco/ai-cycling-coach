@@ -43,8 +43,22 @@ export type Telemetry = {
   vamMh?: number | null;
   wattsPerKg?: number | null;
   gradeTransitionMetersPerPercent?: number;
-  workoutType?: 'RAMP_TEST';
-  workoutPhase?: 'WARMUP' | 'RAMP' | 'DONE' | 'ABORTED';
+  workoutType?: 'RAMP_TEST' | 'STRUCTURED';
+  workoutPhase?: 'WARMUP' | 'RAMP' | 'RUNNING' | 'DONE' | 'ABORTED';
+  workoutId?: string;
+  workoutName?: string;
+  workoutTotalS?: number;
+  workoutBlock?: number | null;
+  workoutBlockCount?: number;
+  workoutBlockName?: string | null;
+  workoutBlockKind?: BlockKind | null;
+  targetCadenceRpm?: number | null;
+  workoutNext?: { name: string; kind: BlockKind; seconds: number; targetW: number; cadence: number | null } | null;
+  workoutFtpW?: number;
+  workoutFtpSource?: string;
+  workoutPlan?: WorkoutBlock[];
+  workoutResults?: BlockResult[];
+  workoutCompliancePct?: number | null;
   workoutRunning?: boolean;
   workoutElapsedS?: number;
   workoutStep?: number | null;
@@ -87,6 +101,26 @@ export type Telemetry = {
 
 export type SessionState = 'IDLE' | 'RUNNING' | 'PAUSED' | 'UNAVAILABLE';
 
+export type BlockKind = 'WARMUP' | 'WORK' | 'REST' | 'COOLDOWN';
+export type WorkoutBlock = {
+  name: string; kind: BlockKind; seconds: number; startPct: number; endPct: number; cadence: number | null;
+  startW: number | null; endW: number | null;
+};
+export type BlockResult = {
+  name: string; kind: BlockKind; seconds: number; plannedSeconds: number; avgW: number; targetW: number;
+  compliancePct: number | null; inRangePct: number;
+};
+export type WorkoutInfo = {
+  id: string; name: string; goal: string; seconds: number; workSeconds: number; intensityFactor: number; tss: number;
+  blocks: WorkoutBlock[];
+};
+export type WorkoutLibrary = { ftpW: number | null; ftpSource: 'profile' | 'history' | null; workouts: WorkoutInfo[] };
+export type SessionWorkout = {
+  type: 'STRUCTURED' | 'RAMP_TEST'; name: string; endReason: string | null; ftpW: number | null;
+  completedPct?: number; workCompliancePct?: number | null; workInRangePct?: number | null; blocks?: BlockResult[];
+  best60sW?: number | null;
+};
+
 export type SessionSummary = {
   session: string;
   startedAtUtc: string;
@@ -118,12 +152,14 @@ export type SessionSummary = {
   bestEffortsW?: Record<string, number | null>;
   best20MinWattsPerKg?: number | null;
   estimatedFtpW?: number | null;
+  workout?: SessionWorkout;
   files: string[];
 };
 
 export type Sample = {
   t: number;
   power: number | null;
+  target?: number | null;     // the workout's power target, when there is one
   heart: number | null;
   cadence: number | null;
   speed: number | null;       // physics speed of the virtual road when there is one, else the trainer's

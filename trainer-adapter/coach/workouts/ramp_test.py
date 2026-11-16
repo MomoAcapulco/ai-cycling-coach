@@ -37,6 +37,16 @@ class RampTest:
         self.ftp: Optional[int] = None
         self.max_hr: Optional[float] = None
 
+    @property
+    def running(self) -> bool:
+        return self.phase in ('WARMUP', 'RAMP')
+
+    def summary(self) -> dict:
+        """What the session summary keeps (session_<stamp>.json → «workout»)."""
+        return {'type': 'RAMP_TEST', 'name': 'Test de FTP (rampa)', 'endReason': self.reason,
+                'best60sW': _round(self.best_60s), 'ftpW': self.ftp, 'maxHeartRate': self.max_hr,
+                'startW': self.start_w, 'stepW': self.step_w}
+
     # ---- clock ----
     def elapsed(self) -> float:
         return self.clock() - self.started

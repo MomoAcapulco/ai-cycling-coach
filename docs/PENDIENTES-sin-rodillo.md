@@ -10,7 +10,8 @@ Lo que se puede hacer y probar sin el rodillo, en orden. Lo que necesita el rodi
 | 3 | **Rutas GPX**: subirlas, guardarlas, ver su perfil y elegir cuál rodar | Hecho (tests y simulador); falta probarlo tú con un GPX real (abajo) |
 | 4 | **Exportar a FIT y validar las métricas** contra intervals.icu o GoldenCheetah (NP, TSS, desnivel) | FIT hecho y validado con las herramientas de Garmin; falta que compares en intervals.icu (`pruebas/VALIDAR-metricas-intervals.md`) |
 | 5 | **Test de FTP** (rampa o 20 min) como primer entrenamiento guiado | Hecho (15-11), probado en el simulador; el test de verdad, con el rodillo (prueba 6 de la otra lista) |
-| 6 | **Entrenamientos estructurados**: bloques con objetivo de vatios, primero sin ERG | Pendiente |
+| 6 | **Entrenamientos estructurados**: bloques con objetivo de vatios, primero sin ERG | Hecho (16-11): 7 entrenamientos para maratón de BTT, probado en el simulador; falta con el rodillo (prueba 7 de la otra lista) |
+| 6b | **Aviso de FTP**: estimarlo tras cada sesión con el modelo de potencia crítica y proponer subirlo o hacer el test, nunca cambiarlo solo (abajo) | Pendiente; antes de la 9 |
 | 7 | **Forma, fatiga y frescura** (CTL, ATL y TSB) con el historial de sesiones | Hecho (15-11), validado con el «Esfuerzo relativo» de Strava; mejora si pones tu pulso en reposo y tu umbral en el perfil |
 | 8 | **Método del desnivel acumulado de las rutas**: decidirlo con GPX reales frente al desnivel oficial | Hecho (15-11): media de 50 m, a menos del 1 % de Strava en tus 3 rutas (abajo) |
 | 9 | **Rutas generadas**: crear rutas a partir de distancia, desnivel, número de subidas… (abajo) | Pendiente |
@@ -64,6 +65,22 @@ Con la aplicación arrancada (`./start.sh`), en **Ajustes**: modo **Simulador** 
    no provoca saltos.
 
 Cuéntame si el desnivel calculado se parece al oficial de la carrera: es la mejor forma de validar el suavizado.
+
+## 6b. Aviso de FTP
+
+El FTP fija todos los objetivos de los entrenamientos, así que no se cambia solo: la aplicación propone y tú decides.
+
+1. **Estimarlo después de cada sesión** con el modelo de potencia crítica: tus mejores esfuerzos de 3 a 20 minutos
+   de las últimas 6–8 semanas (como intervals.icu o WKO), mejor que solo «0,95 × mejor 20 min».
+2. **Si la estimación supera tu FTP un 3 % o más**: aviso «Has rendido por encima de tu FTP: ¿subirlo a X W?»,
+   con un botón.
+3. **Nunca bajarlo automáticamente**: los entrenamientos por debajo del umbral (sweet spot, tempo) no dicen
+   cuánto podrías dar, y el FTP bajaría aunque estuvieras más en forma. Si llevas 6–8 semanas sin esfuerzos
+   máximos, o la estimación cae mucho, el aviso es «toca test de FTP».
+4. **Test de FTP cada 6–8 semanas**, y al empezar o terminar un bloque o antes de afinar para una carrera (para las
+   maratones: al empezar la preparación y unas 3–4 semanas antes).
+5. **Rodillo y calle por separado**: en el rodillo el FTP suele salir un 5–10 % más bajo. Para los
+   entrenamientos de rodillo, el medido en el rodillo; el historial de Strava mezcla las dos cosas.
 
 ## 8. Desnivel acumulado de las rutas: decidir el método con GPX reales
 

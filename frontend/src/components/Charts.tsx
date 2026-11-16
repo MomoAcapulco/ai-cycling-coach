@@ -11,7 +11,8 @@ const anchor = (x: number) => (x < 40 ? 'start' : x > W - 40 ? 'end' : 'middle')
 export function TraceChart({ points, field, color, unit, current, duration, fullView }: {
   points: Sample[]; field: Field; color: string; unit: string; current: number; duration: number; fullView: boolean;
 }) {
-  const valid = points.map((p) => p[field]).filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+  const targets = field === 'power' ? points.filter((p) => p.target != null) : [];
+  const valid = [...points.map((p) => p[field]), ...targets.map((p) => p.target)].filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
   if (!valid.length) return <div className="chart-empty">No hay datos disponibles</div>;
   const H = 170, padX = 12, padY = 12, axis = 16;
   const max = Math.max(1, ...valid) * 1.08;
@@ -28,8 +29,17 @@ export function TraceChart({ points, field, color, unit, current, duration, full
     d += `${drawing ? 'L' : 'M'}${x(p.t).toFixed(2)},${y(v).toFixed(2)} `;
     drawing = true;
   }
+  // the workout's target, as a dashed line under the power (a gap where there was no target)
+  let targetPath = '';
+  let onTarget = false;
+  for (const p of (fullView ? points : visible)) {
+    if (field !== 'power' || p.target == null) { onTarget = false; continue; }
+    targetPath += `${onTarget ? 'L' : 'M'}${x(p.t).toFixed(2)},${y(p.target).toFixed(2)} `;
+    onTarget = true;
+  }
   const pointer = x(Math.max(0, Math.min(current, span)));
   const shown = visible.filter((p) => p[field] != null).length;
+  const values = points.map((p) => p[field]).filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
   return (
     <div className="chart-wrapper">
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Gráfico de ${field}`} preserveAspectRatio="none">
@@ -39,10 +49,11 @@ export function TraceChart({ points, field, color, unit, current, duration, full
         {timeTicks(span).map(([t, label]) => (
           <text key={t} x={x(t)} y={H - 2} fontSize="10" textAnchor={anchor(x(t))} fill="#7f9a94">{label}</text>
         ))}
+        {targetPath && <path d={targetPath} fill="none" stroke="#e8f1ee" strokeOpacity=".7" strokeWidth="1.6" strokeDasharray="6 4" />}
         <path d={d} fill="none" stroke={color} strokeWidth="2.3" strokeLinejoin="round" />
         <line x1={pointer} x2={pointer} y1="0" y2={H - axis} stroke="#e0e8d8" strokeWidth="1.5" strokeDasharray="5 4" />
       </svg>
-      <span>{shown} de {valid.length} muestras · media total {fmt(average(valid), 1)} {unit}</span>
+      <span>{shown} de {values.length} muestras · media total {fmt(average(values), 1)} {unit}{targetPath ? ' · ┄ objetivo' : ''}</span>
     </div>
   );
 }
