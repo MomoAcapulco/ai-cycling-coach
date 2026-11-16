@@ -1,3 +1,4 @@
+import sqlite3
 """Admin page backend: settings, live mode switching, recordings upload, device forgetting."""
 import json
 import tempfile
@@ -13,6 +14,7 @@ from coach.app.recordings_store import list_recordings, safe_filename, save_uplo
 from coach.app.runtime import AdapterRuntime, EnvConfig
 from coach.app.server import make_server
 from coach.app.settings import Settings, SettingsStore
+from coach.app import db
 
 CSV = ('elapsedSeconds,source,powerWatts,cadenceRpm,speedKph,connected,status,heartRateBpm,heartRateConnected,targetGradePercent\n'
        '0,WAHOO,100,60,15,true,STREAMING,120,true,\n'
@@ -78,11 +80,13 @@ class SettingsTests(unittest.TestCase):
             store.save(Settings(mode='WAHOO', hr_enabled=True))
             self.assertEqual(store.load(defaults)[0].mode, 'WAHOO')
             self.assertEqual(store.load(defaults)[1], 'saved')
-            store.path.write_text('{oops')
+            with db.opened(store.path) as conn:                     # a value that is not valid any more
+                conn.execute("UPDATE settings SET value = '{oops'")
             self.assertEqual(store.load(defaults), (defaults, 'env'))
             store.reset()
             store.reset()
-            self.assertFalse(store.path.exists())
+            self.assertEqual(store.load(defaults), (defaults, 'env'))
+            self.assertEqual(store.saved(), {})
 
 
 class RecordingsTests(unittest.TestCase):
@@ -123,7 +127,7 @@ class AdminServerTests(unittest.TestCase):
         self.recordings.mkdir()
         (self.recordings / 'ride.csv').write_text(CSV)
         self.registry = DeviceRegistry(root / 'devices.json')
-        self.store = SettingsStore(root / 'settings.json')
+        self.store = SettingsStore(root / 'coach.db')
         self.runtime = AdapterRuntime(EnvConfig(record_dir=self.recordings), Settings(mode='SIMULATOR'),
                                       store=self.store, registry=self.registry, start_workers=False).start()
         self.httpd = make_server('127.0.0.1', 0, self.runtime)
@@ -152,7 +156,7 @@ class AdminServerTests(unittest.TestCase):
         self.assertTrue(self.store.path.exists())
         status, result = self.call('POST', '/admin/settings/reset')
         self.assertEqual((result['source'], result['settings']['mode']), ('env', 'SIMULATOR'))
-        self.assertFalse(self.store.path.exists())
+        self.assertEqual(self.store.saved(), {})
         self.assertEqual(self.call('GET', '/telemetry')[1]['source'], 'SIMULATOR')
 
     def test_saved_settings_survive_a_restart(self):
@@ -167,7 +171,7 @@ class AdminServerTests(unittest.TestCase):
                 self.call('POST', '/admin/settings', body)
             self.assertEqual(ctx.exception.code, 400)
         self.assertEqual(self.call('GET', '/admin/settings')[1]['settings']['mode'], 'SIMULATOR')
-        self.assertFalse(self.store.path.exists())
+        self.assertEqual(self.store.saved(), {})
 
     def test_upload_then_replay_it(self):
         status, info = self.call('POST', '/admin/recordings?name=nueva.csv', raw=CSV.encode(), content_type='text/csv')

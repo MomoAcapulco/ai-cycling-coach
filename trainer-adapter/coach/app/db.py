@@ -42,11 +42,32 @@ def default_path() -> Path:
     return Path(override).expanduser() if override else data_home() / DB_NAME
 
 
+def open_default() -> Path:
+    """The rider's database, up to date, with the JSON files of earlier versions imported (coach/app/legacy_json.py)."""
+    path = migrate(default_path())
+    from coach.app.legacy_json import import_all
+    from coach.app.paths import data_home
+    import_all(data_home(), path)
+    return path
+
+
 def connect(path) -> sqlite3.Connection:
     """A connection with foreign keys on and a wait instead of an error while another thread writes."""
     conn = sqlite3.connect(Path(path), timeout=10)
     conn.execute('PRAGMA foreign_keys = ON')
     return conn
+
+
+@contextmanager
+def opened(path):
+    """``with opened(path) as conn``: commits on success, rolls back on error, and always closes the connection
+    (``with sqlite3.connect(…)`` alone commits but leaves it open)."""
+    conn = connect(path)
+    try:
+        with conn:
+            yield conn
+    finally:
+        conn.close()
 
 
 def _activity_columns():
@@ -158,7 +179,28 @@ def _run_script(db: sqlite3.Connection, script: str):
             db.execute(statement)
 
 
-MIGRATIONS = {1: _v1}
+def _v2(db: sqlite3.Connection):
+    """Routes: the same file name can come back (a route deleted, another GPX uploaded with its name), so ``file`` is
+    no longer unique; a row belongs to the GPX whose fingerprint (``sha256``) it has. Deleted routes keep their row
+    for the sessions ridden on them."""
+    _run_script(db, '''
+        CREATE TABLE routes_v2 (
+            id TEXT PRIMARY KEY, file TEXT NOT NULL, sha256 TEXT, name TEXT, gpx_name TEXT,
+            generated INTEGER NOT NULL DEFAULT 0, generator TEXT, recorded INTEGER NOT NULL DEFAULT 0,
+            distance_m REAL, gain_m REAL, loss_m REAL,
+            created_utc TEXT, deleted_utc TEXT
+        );
+        INSERT INTO routes_v2 (id, file, name, gpx_name, generated, generator, recorded, distance_m, gain_m, loss_m,
+                               created_utc, deleted_utc)
+            SELECT id, file, name, gpx_name, generated, generator, recorded, distance_m, gain_m, loss_m,
+                   created_utc, deleted_utc FROM routes;
+        DROP TABLE routes;
+        ALTER TABLE routes_v2 RENAME TO routes;
+        CREATE INDEX routes_file ON routes(file, sha256)
+    ''')
+
+
+MIGRATIONS = {1: _v1, 2: _v2}
 SCHEMA_VERSION = max(MIGRATIONS)
 
 
@@ -174,7 +216,7 @@ def schema_version(db: sqlite3.Connection) -> int:
 
 
 def meta(path, key: str):
-    with connect(path) as db:
+    with opened(path) as db:
         row = db.execute('SELECT value FROM meta WHERE key = ?', (key,)).fetchone()
         return row[0] if row else None
 

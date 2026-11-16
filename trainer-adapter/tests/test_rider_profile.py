@@ -1,3 +1,4 @@
+import sqlite3
 import json
 import tempfile
 import unittest
@@ -10,6 +11,7 @@ from coach.app.rider_profile import ProfileStore, RiderProfile
 from coach.app.runtime import AdapterRuntime, EnvConfig
 from coach.app.server import make_server
 from coach.app.settings import Settings
+from coach.app import db
 
 
 class ProfileTests(unittest.TestCase):
@@ -38,7 +40,9 @@ class ProfileTests(unittest.TestCase):
             profile, saved = store.load()
             self.assertTrue(saved)
             self.assertEqual((profile.rider_weight_kg, profile.ftp_watts), (80.0, 200))
-            store.path.write_text('{bad')
+            self.assertEqual([v['ftpWatts'] for _, v in store.versions()], [None, 200])   # every version kept
+            with db.opened(store.path) as conn:                                  # a value no version allows
+                conn.execute('UPDATE profile SET rider_weight_kg = 900')
             self.assertEqual(store.load(), (RiderProfile(), False))
 
 

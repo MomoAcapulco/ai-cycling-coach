@@ -105,7 +105,7 @@ export function Routes({ data }: { data: Telemetry | null }) {
           <h1>Rueda un recorrido real <Help title="Cómo funcionan las rutas">
         <p>La pendiente cambia con la misma transición suave de siempre. Las bajadas de más del −5 % se notan en el rodillo como tu
           límite de bajada (Ajustes → Perfil): el rodillo no puede empujarte cuesta abajo. Sí cuentan para la velocidad y la distancia.</p>
-        <p>Los GPX se guardan en tu carpeta de datos, fuera del repositorio: {listing?.folder ?? '—'}</p>
+        <p>Los GPX se guardan en tu carpeta de datos, en tu ordenador y fuera del repositorio.</p>
       </Help></h1>
           <p className="muted">Sube el GPX de una carrera o de una subida, o genera una: la pendiente seguirá su perfil según avanzas.</p>
         </div>

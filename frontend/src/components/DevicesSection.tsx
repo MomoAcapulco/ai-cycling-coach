@@ -49,7 +49,7 @@ export function DevicesSection({ initial }: { initial: DevicesState | null }) {
       <div className="panel-heading"><h2>Dispositivos <Help title="Cómo funcionan los dispositivos">
       <p>
         Se encuentran por su tipo (lo que anuncian por Bluetooth), de cualquier marca, y se recuerdan todos los que has
-        usado ({devices?.registryFile ?? '—'}). Al conectar se usa el preferido si está
+        usado. Al conectar se usa el preferido si está
         cerca; si no, el último que usaste. Si hay varios desconocidos y ninguno conocido, no se elige al azar: aparecen
         aquí para que elijas. El pulsómetro y los mandos cambian al momento; el rodillo, en la siguiente conexión.
       </p>

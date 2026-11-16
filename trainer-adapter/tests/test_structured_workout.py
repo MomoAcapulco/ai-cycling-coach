@@ -111,7 +111,7 @@ class ApiTests(unittest.TestCase):
         from coach.app.settings import Settings
         self.temp = tempfile.TemporaryDirectory()
         self.folder = Path(self.temp.name)
-        self.profiles = ProfileStore(self.folder / 'profile.json')
+        self.profiles = ProfileStore(self.folder / 'coach.db')
         self.runtime = AdapterRuntime(EnvConfig(record_dir=self.folder, routes_dir=self.folder / 'r',
                                                 history_db=self.folder / 'h.db'),
                                       Settings(mode='SIMULATOR'), start_workers=False, profile_store=self.profiles).start()

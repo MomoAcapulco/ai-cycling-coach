@@ -3,7 +3,14 @@
 Stored in ``routes`` in the data home (coach/app/paths.routes_dir), outside the repository: a GPX may be one of
 the rider's own rides, with the places they go. Same rules as the replay recordings: a safe file name, the file is
 parsed BEFORE it is stored, nothing is ever overwritten (a name already taken gets _1, _2…).
+
+The GPX files stay files (their geometry, openable with any program); the catalogue is the ``routes`` table of the
+local database (coach/app/db.py): the name the rider gave, generated or uploaded, the generator's settings, distance
+and climbing, and when a route was deleted. A row belongs to the GPX whose fingerprint (``sha256``) it has, so a new
+GPX uploaded with the name of a deleted one starts clean. Until 16-11 the names were in ``routes/names.json``
+(coach/app/legacy_json.py imports it once).
 """
+import hashlib
 import json
 import re
 import unicodedata
@@ -16,9 +23,9 @@ GENERATED_PREFIX = 'gen_'      # generated routes: told apart from the uploaded 
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024   # recordings of a 24 h ride with heart rate, cadence… reach tens of MB
 SAFE_NAME = re.compile(r'[^A-Za-z0-9._-]+')
 TRASH = '.papelera'           # deleted routes and sessions go here, never removed: they can be put back by hand
-NAMES_FILE = 'names.json'     # {file: name} chosen by the rider; the GPX files are never rewritten for a name
-_names_lock = Lock()
-_cache = {}          # (path, mtime, size) -> Route: parsing a big GPX on every listing would be slow
+NAMES_FILE = 'names.json'     # until 16-11: {file: name} chosen by the rider (now the routes table)
+_db_lock = Lock()
+_cache = {}          # (path, mtime, size) -> (Route, sha256): parsing a big GPX on every listing would be slow
 _cache_lock = Lock()
 
 
@@ -31,29 +38,47 @@ def safe_filename(name: str) -> str:
     return base
 
 
-def _names(folder: Path) -> dict:
-    try:
-        names = json.loads((Path(folder) / NAMES_FILE).read_text(encoding='utf-8'))
-        return names if isinstance(names, dict) else {}
-    except (OSError, ValueError):
-        return {}
+def _database(db_path=None):
+    from coach.app import db
+    return db.migrate(db_path) if db_path else db.open_default()
 
 
-def rename(folder: Path, file: str, name) -> dict:
+def _current(conn, file: str, sha: str):
+    """The catalogue row of this very GPX (same file name AND same content), or None."""
+    return conn.execute('SELECT id, name FROM routes WHERE file = ? AND sha256 = ? AND deleted_utc IS NULL '
+                        'ORDER BY created_utc DESC LIMIT 1', (file, sha)).fetchone()
+
+
+def _register(conn, route: Route, sha: str, generator: dict = None) -> str:
+    """Add this GPX to the catalogue (if it is not there yet) and return its id."""
+    from coach.app import db
+    row = _current(conn, route.file, sha)
+    if row:
+        return row[0]
+    route_id = db.new_id()
+    conn.execute('INSERT INTO routes (id, file, sha256, gpx_name, generated, generator, recorded, distance_m, gain_m, '
+                 'loss_m, created_utc) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                 (route_id, route.file, sha, route.gpx_name, int(_is_generated(route.file)),
+                  json.dumps(generator, ensure_ascii=False) if generator else None, int(route.timed_points >= 2),
+                  route.distance_m, route.gain_m, route.loss_m, db.now_utc()))
+    return route_id
+
+
+def _is_generated(file: str) -> bool:
+    return file.startswith((GENERATED_PREFIX, 'generada_', 'como_'))   # + the first generated ones
+
+
+def rename(folder: Path, file: str, name, db_path=None) -> dict:
     """Give the route ``file`` the rider's own ``name`` (empty: back to the GPX's)."""
+    from coach.app import db
     from coach.session.route_generator import route_name
-    route = load_route(folder, file)                   # FileNotFoundError for anything that is not a route
+    route, sha = _parsed(folder, file)                 # FileNotFoundError for anything that is not a route
     name = route_name(name if name is not None else '')
-    with _names_lock:
-        names = _names(folder)
-        if name and name != route.gpx_name:
-            names[file] = name
-        else:
-            names.pop(file, None)
-        tmp = Path(folder) / (NAMES_FILE + '.tmp')
-        tmp.write_text(json.dumps(names, ensure_ascii=False, indent=2), encoding='utf-8')
-        tmp.replace(Path(folder) / NAMES_FILE)
-    return {**load_route(folder, file).summary(), 'valid': True, 'error': None}
+    with _db_lock, db.opened(_database(db_path)) as conn:
+        route_id = _register(conn, route, sha)
+        conn.execute('UPDATE routes SET name = ? WHERE id = ?',
+                     (name if name and name != route.gpx_name else None, route_id))
+    return {**load_route(folder, file, db_path).summary(), 'valid': True, 'error': None}
 
 
 def to_trash(folder: Path, names) -> list:
@@ -74,14 +99,14 @@ def to_trash(folder: Path, names) -> list:
     return moved
 
 
-def delete_route(folder: Path, file: str) -> dict:
-    """Move a route to the trash and forget the name the rider gave it."""
-    load_route(folder, file)                             # FileNotFoundError for anything that is not a route
+def delete_route(folder: Path, file: str, db_path=None) -> dict:
+    """Move a route to the trash; its catalogue row stays, marked deleted (sessions ridden on it still name it)."""
+    from coach.app import db
+    route, sha = _parsed(folder, file)                 # FileNotFoundError for anything that is not a route
+    with _db_lock, db.opened(_database(db_path)) as conn:
+        route_id = _register(conn, route, sha)
+        conn.execute('UPDATE routes SET deleted_utc = ? WHERE id = ?', (db.now_utc(), route_id))
     moved = to_trash(folder, [file])
-    with _names_lock:
-        names = _names(folder)
-        if names.pop(file, None) is not None:
-            (Path(folder) / NAMES_FILE).write_text(json.dumps(names, ensure_ascii=False, indent=2), encoding='utf-8')
     with _cache_lock:
         for key in [k for k in _cache if Path(k[0]).name == file and Path(k[0]).parent == Path(folder)]:
             del _cache[key]
@@ -94,8 +119,8 @@ def slug(name: str) -> str:
     return SAFE_NAME.sub('_', plain).strip('._')[:60] or 'ruta'
 
 
-def load_route(folder: Path, file: str) -> Route:
-    """The route ``file`` of ``folder`` (a bare file name; anything else is refused)."""
+def _parsed(folder: Path, file: str):
+    """(route, sha256) of ``file`` in ``folder`` (a bare file name; anything else is refused), cached."""
     if not file or Path(file).name != file or not file.lower().endswith('.gpx'):
         raise FileNotFoundError(file)
     path = Path(folder) / file
@@ -105,36 +130,47 @@ def load_route(folder: Path, file: str) -> Route:
     key = (str(path), stat.st_mtime, stat.st_size)
     with _cache_lock:
         if key in _cache:
-            return _named(_cache[key], folder)
-    route = parse_gpx(path.read_bytes(), file)
+            return _cache[key]
+    data = path.read_bytes()
+    parsed = (parse_gpx(data, file), hashlib.sha256(data).hexdigest())
     with _cache_lock:
-        _cache[key] = route
-    return _named(route, folder)
+        _cache[key] = parsed
+    return parsed
 
 
-def _named(route: Route, folder: Path) -> Route:
-    route.name = _names(folder).get(route.file) or route.gpx_name
+def load_route(folder: Path, file: str, db_path=None) -> Route:
+    """The route ``file`` of ``folder``, with the name the rider gave it."""
+    from coach.app import db
+    route, sha = _parsed(folder, file)
+    with db.opened(_database(db_path)) as conn:
+        row = _current(conn, route.file, sha)
+    route.name = (row[1] if row else None) or route.gpx_name
     return route
 
 
-def list_routes(folder: Path):
+def list_routes(folder: Path, db_path=None):
+    """Every GPX of ``folder``, newest first; each valid one is also put in the catalogue (once)."""
+    from coach.app import db
     folder = Path(folder)
     if not folder.is_dir():
         return []
     out = []
     for path in sorted(folder.glob('*.gpx'), key=lambda p: p.stat().st_mtime, reverse=True):
         try:
-            route = load_route(folder, path.name)
+            route, sha = _parsed(folder, path.name)
+            with _db_lock, db.opened(_database(db_path)) as conn:
+                _register(conn, route, sha)
+            route = load_route(folder, path.name, db_path)
             out.append({**route.summary(), 'valid': True, 'error': None, 'thumb': route.profile(max_points=80),
                         'recorded': route.timed_points >= 2,   # a recorded ride: its own replay
-                        'generated': path.name.startswith((GENERATED_PREFIX, 'generada_', 'como_')),   # + the first ones
+                        'generated': _is_generated(path.name),
                         'gpxName': route.gpx_name})
         except (RouteError, OSError) as exc:
             out.append({'file': path.name, 'name': path.stem, 'valid': False, 'error': str(exc)[:200]})
     return out
 
 
-def generate(folder: Path, body: dict) -> dict:
+def generate(folder: Path, body: dict, db_path=None) -> dict:
     """A generated route (coach/session/route_generator.py): previewed, or saved as a GPX with ``save``.
 
     ``mode`` «custom» takes distanceKm, gainM, climbs, avgGrade, maxGrade, kicks, descentGrade; «like» takes the
@@ -148,7 +184,7 @@ def generate(folder: Path, body: dict) -> dict:
         route, data, seed = generate_custom(body, seed, name)
     elif mode == 'like':
         try:
-            race = load_route(folder, body.get('file'))
+            race = load_route(folder, body.get('file'), db_path)
         except FileNotFoundError:
             raise ValueError('file must be one of your routes')
         route, data, seed = generate_like(race, body.get('distanceKm'), seed, name)
@@ -157,12 +193,14 @@ def generate(folder: Path, body: dict) -> dict:
     filename = f'{GENERATED_PREFIX}{slug(route.name)}.gpx'     # from the name (proposed or the rider's)
     out = {**route.summary(), 'seed': seed, 'profile': route.profile(600), 'saved': False}
     if body.get('save'):
-        saved = save_upload(folder, filename, data)
+        generator = {k: body.get(k) for k in ('mode', 'file', 'distanceKm', 'gainM', 'climbs', 'avgGrade', 'maxGrade',
+                                              'kicks', 'descentGrade') if body.get(k) is not None}
+        saved = save_upload(folder, filename, data, db_path, {**generator, 'seed': seed})
         out.update(file=saved['file'], saved=True)
     return out
 
 
-def save_upload(folder: Path, name: str, data: bytes) -> dict:
+def save_upload(folder: Path, name: str, data: bytes, db_path=None, generator: dict = None) -> dict:
     """Validate an uploaded GPX as a ridable route and store it without overwriting anything."""
     if not data:
         raise ValueError('Empty file')
@@ -184,4 +222,7 @@ def save_upload(folder: Path, name: str, data: bytes) -> dict:
     tmp.write_bytes(data)
     tmp.rename(target)
     route.file = target.name
+    from coach.app import db
+    with _db_lock, db.opened(_database(db_path)) as conn:
+        _register(conn, route, hashlib.sha256(data).hexdigest(), generator)
     return {**route.summary(), 'valid': True, 'error': None}

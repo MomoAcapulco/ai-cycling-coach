@@ -50,10 +50,10 @@ class HistoryStore:
 
     @classmethod
     def default(cls):
-        return cls(db_module.default_path())
+        return cls(db_module.open_default())
 
     def _db(self):
-        return db_module.connect(self.path)
+        return db_module.opened(self.path)
 
     def has(self, activity_id: str) -> bool:
         with self.lock, self._db() as db:

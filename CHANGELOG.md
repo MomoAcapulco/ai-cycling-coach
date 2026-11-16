@@ -75,6 +75,14 @@ Historial de versiones (lo que antes estaba en un README por versión). La más 
   - Al iniciar una sesión nueva, las gráficas, el perfil del recorrido y la pendiente máxima **empiezan de cero**, con el tiempo de la sesión. Antes arrastraban todo lo anterior. Al terminar, la última sesión se queda en pantalla hasta empezar otra.
   - Botones ±0,5 % de la pendiente: varias pulsaciones seguidas solo contaban una por segundo, porque cada pulsación sumaba a la última lectura de telemetría y el botón se bloqueaba mientras se enviaba. Ahora cada pulsación suma al instante y se envía una sola vez, 0,3 s después de la última, con el total. El deslizador no tenía el problema.
   - Pulsómetro: si no se ve la banda, el Panel ya dice qué comprobar (que esté puesta y humedecida, y que no esté conectada a un reloj, al móvil o a Zwift) y la terminal lo escribe una vez. Antes solo ponía «WAITING».
+- **Base de datos, fase 2a y 2b** (ADR-003):
+  - **Perfil y ajustes** en la base de datos (`profile`, `settings`). Cada vez que guardas el perfil queda una versión en `profile_versions`: la evolución del FTP y del peso, para la IA.
+  - **Catálogo de rutas** (`routes`): el nombre que les das, si es generada (con sus ajustes y su semilla) o grabada, la distancia y el desnivel, y cuándo se borró. Los GPX siguen siendo ficheros.
+  - **Esquema v2**: el nombre de fichero de una ruta ya no es único, y cada fila lleva la huella del GPX (`sha256`). Un GPX nuevo subido con el nombre de uno borrado empieza limpio, sin el nombre que le diste al antiguo, y la ruta borrada se queda en la tabla para las sesiones rodadas en ella.
+  - Los JSON de antes (`profile.json`, `settings.json`, `routes/names.json`) se importan una vez al arrancar y se **mueven** a `backup-json-<fecha>/` (no se borran) (`coach/app/legacy_json.py`). Con tus datos: perfil y ajustes idénticos campo a campo.
+  - Las conexiones a la base de datos se cierran siempre (`db.opened`): antes quedaban abiertas.
+- **Ajustes**: fuera la sección «Grabación para el replay». El replay se abre desde Sesiones («Ver en replay») o desde Rutas; en «Fuente de datos» quedan Rodillo real y Simulador, y si estás en un replay lo dice, con «Salir del replay».
+- Las ayudas de Dispositivos y Rutas ya no enseñan la ruta completa de tus ficheros.
 - **Base de datos local `coach.db`, fase 1** (`coach/app/db.py`, diseño en `docs/adr/ADR-003-base-de-datos.md`):
   - Sustituye a `history.db`: al arrancar se crea y se copian sus actividades una sola vez (con tus datos, las 122, sin un valor distinto). `history.db` no se toca y queda como copia.
   - Versión del esquema y migraciones numeradas: cada una entera o nada (si falla, la base de datos queda como estaba), con una copia antes de migrar (`coach.db.bak-v<n>-<fecha>`). Una base de datos de una versión más nueva de la app no se toca.

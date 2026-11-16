@@ -71,7 +71,7 @@ class EnvConfig:
     zwift_left_id: Optional[str] = None
     zwift_right_id: Optional[str] = None
     routes_dir: Path = field(default_factory=routes_dir)
-    history_db: Optional[Path] = None   # None: the data home's coach.db (coach/app/db.py)
+    history_db: Optional[Path] = None   # the local database (history, routes…); None: the data home's coach.db (coach/app/db.py)
 
     @classmethod
     def from_env(cls, env=None):

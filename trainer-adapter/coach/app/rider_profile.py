@@ -1,11 +1,11 @@
 """Rider profile: the per-user numbers that physics, safety limits and metrics depend on.
 
-Stored in ``profile.json`` in the data home (coach/app/paths.py) (override with PROFILE_FILE), outside the version
-folders. Editing it never restarts the Bluetooth workers. Values outside realistic ranges are
+Stored in the ``profile`` table of the local database (coach/app/db.py, ``coach.db`` in the data home), with every
+saved version in ``profile_versions`` (how FTP and weight change over time, for the AI). Until 16-11 it was
+``profile.json``: coach/app/legacy_json.py imports it once. Editing it never restarts the Bluetooth workers. Values outside realistic ranges are
 rejected rather than clamped, so a typo (800 kg) is reported instead of silently used.
 """
 import json
-import os
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -114,40 +114,76 @@ class RiderProfile:
         return self
 
 
+# RiderProfile field → column of the profile table (ADR-003)
+COLUMNS = {'rider_weight_kg': 'rider_weight_kg', 'bike_weight_kg': 'bike_weight_kg', 'ftp_watts': 'ftp_w',
+           'drivetrain': 'drivetrain', 'grade_difficulty_percent': 'grade_difficulty_pct',
+           'grade_descent_factor_percent': 'grade_descent_factor_pct', 'max_grade_percent': 'max_grade_pct',
+           'min_grade_percent': 'min_grade_pct', 'grade_transition_m_per_percent': 'grade_transition_m_per_pct',
+           'bike_type': 'bike_type', 'resting_heart_rate': 'resting_hr', 'max_heart_rate': 'max_hr',
+           'threshold_heart_rate': 'threshold_hr'}
+JSON_KEY = {field: key for key, field in FIELDS.items()}
+
+
 class ProfileStore:
+    """The rider profile in the local database (one row), and its history of versions."""
+
     def __init__(self, path):
-        self.path = Path(path).expanduser()
+        from coach.app import db
+        self.path = db.migrate(path)
         self.lock = Lock()
 
     @classmethod
     def default(cls):
-        from coach.app.paths import data_file
-        return cls(data_file('profile.json', 'PROFILE_FILE'))
+        from coach.app import db
+        return cls(db.open_default())
+
+    def _db(self):
+        from coach.app import db
+        return db.opened(self.path)
 
     def load(self):
-        """(profile, saved?) — defaults when there is no usable file."""
-        with self.lock:
-            try:
-                data = json.loads(self.path.read_text(encoding='utf-8'))
-            except FileNotFoundError:
-                return RiderProfile(), False
-            except (OSError, ValueError) as exc:
-                print(f'WARNING: ignoring unreadable profile {self.path}: {exc}', flush=True)
-                return RiderProfile(), False
+        """(profile, saved?) — defaults when nothing was saved or the saved row is not valid."""
+        with self.lock, self._db() as conn:
+            row = conn.execute(f"SELECT {', '.join(COLUMNS.values())} FROM profile WHERE id = 1").fetchone()
+        if row is None:
+            return RiderProfile(), False
+        data = {}
+        for (field, _column), value in zip(COLUMNS.items(), row):
+            if value is None and field not in OPTIONAL_WHOLE:
+                continue                                   # a column added later: the default
+            if value is not None and field in OPTIONAL_WHOLE + WHOLE_NUMBERS:
+                value = int(value)                         # SQLite may hand back 50.0
+            data[JSON_KEY[field]] = value
         try:
-            return RiderProfile().updated(data.get('profile', {})), True
+            return RiderProfile().updated(data), True
         except (ValueError, AttributeError) as exc:
-            print(f'WARNING: ignoring invalid profile {self.path}: {exc}', flush=True)
+            print(f'WARNING: ignoring invalid profile in {self.path}: {exc}', flush=True)
             return RiderProfile(), False
 
     def update(self, changes: dict):
         profile, _ = self.load()
         new = profile.updated(changes)
-        with self.lock:
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            tmp = self.path.with_name(self.path.name + '.tmp')
-            tmp.write_text(json.dumps({'version': 1, 'profile': new.to_json(),
-                                       'updatedAtUtc': datetime.now(timezone.utc).isoformat(timespec='seconds')},
-                                      indent=2), encoding='utf-8')
-            os.replace(tmp, self.path)
+        self._write(new, datetime.now(timezone.utc).isoformat(timespec='seconds'))
         return new
+
+    def import_saved(self, data: dict, saved_utc: str = None) -> RiderProfile:
+        """A profile saved by an earlier version (profile.json), as if it had been saved at ``saved_utc``."""
+        new = RiderProfile().updated(data)
+        self._write(new, saved_utc or datetime.now(timezone.utc).isoformat(timespec='seconds'))
+        return new
+
+    def versions(self):
+        """Every saved profile, oldest first: [(valid_from_utc, profile json)]."""
+        with self.lock, self._db() as conn:
+            rows = conn.execute('SELECT valid_from_utc, data FROM profile_versions ORDER BY valid_from_utc, rowid').fetchall()
+        return [(at, json.loads(data)) for at, data in rows]
+
+    def _write(self, profile: RiderProfile, at: str):
+        from coach.app import db
+        values = [getattr(profile, field) for field in COLUMNS]
+        columns = ', '.join(COLUMNS.values())
+        with self.lock, self._db() as conn:
+            conn.execute(f"INSERT OR REPLACE INTO profile (id, {columns}, updated_utc) VALUES "
+                         f"(1, {', '.join('?' for _ in values)}, ?)", values + [at])
+            conn.execute('INSERT INTO profile_versions (id, valid_from_utc, data) VALUES (?, ?, ?)',
+                         (db.new_id(), at, json.dumps(profile.to_json(), ensure_ascii=False)))

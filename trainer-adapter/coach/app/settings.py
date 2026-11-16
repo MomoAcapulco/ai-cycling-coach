@@ -1,7 +1,8 @@
 """User settings that can change while the adapter runs (admin page).
 
-``.env`` gives the defaults. Saving from the admin page writes ``settings.json`` in the data home (coach/app/paths.py)
-(override with SETTINGS_FILE), which then wins over ``.env`` until it is reset. Ports, device IDs,
+``.env`` gives the defaults. Saving from the admin page writes the ``settings`` table of the local database
+(coach/app/db.py), which then wins over ``.env`` until it is reset (until 16-11 it was ``settings.json``:
+coach/app/legacy_json.py imports it once). Ports, device IDs,
 name hints and the experimental physical control stay in ``.env`` only: none of them should be one
 click away.
 """
@@ -113,41 +114,53 @@ class Settings:
 
 
 class SettingsStore:
+    """The saved settings in the local database: one row per setting, its value as JSON."""
+
     def __init__(self, path):
-        self.path = Path(path).expanduser()
+        from coach.app import db
+        self.path = db.migrate(path)
         self.lock = Lock()
 
     @classmethod
     def default(cls):
-        from coach.app.paths import data_file
-        return cls(data_file('settings.json', 'SETTINGS_FILE'))
+        from coach.app import db
+        return cls(db.open_default())
+
+    def _db(self):
+        from coach.app import db
+        return db.opened(self.path)
+
+    def saved(self) -> dict:
+        with self.lock, self._db() as conn:
+            rows = conn.execute('SELECT key, value FROM settings').fetchall()
+        out = {}
+        for key, value in rows:
+            try:
+                out[key] = json.loads(value)
+            except (TypeError, ValueError):
+                print(f'WARNING: ignoring unreadable setting {key} in {self.path}', flush=True)
+        return out
 
     def load(self, defaults: Settings):
         """(settings, source): the saved settings over the .env defaults, or the defaults alone."""
-        with self.lock:
-            try:
-                data = json.loads(self.path.read_text(encoding='utf-8'))
-            except FileNotFoundError:
-                return defaults, 'env'
-            except (OSError, ValueError) as exc:
-                print(f'WARNING: ignoring unreadable settings {self.path}: {exc}', flush=True)
-                return defaults, 'env'
+        data = self.saved()
+        if not data:
+            return defaults, 'env'
         try:
-            return defaults.updated(data.get('settings', {})), 'saved'
+            return defaults.updated(data), 'saved'
         except (ValueError, AttributeError) as exc:
-            print(f'WARNING: ignoring invalid settings {self.path}: {exc}', flush=True)
+            print(f'WARNING: ignoring invalid settings in {self.path}: {exc}', flush=True)
             return defaults, 'env'
 
     def save(self, settings: Settings):
-        with self.lock:
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            tmp = self.path.with_name(self.path.name + '.tmp')
-            tmp.write_text(json.dumps({'version': 1, 'settings': settings.to_json()}, indent=2), encoding='utf-8')
-            os.replace(tmp, self.path)
+        self.save_raw(settings.to_json())
+
+    def save_raw(self, values: dict):
+        with self.lock, self._db() as conn:
+            conn.execute('DELETE FROM settings')
+            conn.executemany('INSERT INTO settings (key, value) VALUES (?, ?)',
+                             [(k, json.dumps(v)) for k, v in values.items()])
 
     def reset(self):
-        with self.lock:
-            try:
-                self.path.unlink()
-            except FileNotFoundError:
-                pass
+        with self.lock, self._db() as conn:
+            conn.execute('DELETE FROM settings')

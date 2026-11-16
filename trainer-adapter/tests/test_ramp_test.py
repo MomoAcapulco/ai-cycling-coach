@@ -92,7 +92,7 @@ class ApiTests(unittest.TestCase):
         from coach.app.settings import Settings
         self.temp = tempfile.TemporaryDirectory()
         folder = Path(self.temp.name)
-        self.profiles = ProfileStore(folder / 'profile.json')
+        self.profiles = ProfileStore(folder / 'coach.db')
         self.runtime = AdapterRuntime(EnvConfig(record_dir=folder, routes_dir=folder / 'r', history_db=folder / 'h.db'),
                                       Settings(mode='SIMULATOR'), start_workers=False, profile_store=self.profiles).start()
         self.httpd = make_server('127.0.0.1', 0, self.runtime)

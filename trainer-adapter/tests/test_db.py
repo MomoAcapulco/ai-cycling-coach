@@ -14,14 +14,14 @@ TABLES = {'meta', 'activities', 'profile', 'profile_versions', 'settings', 'sess
 
 
 def tables(path):
-    with sqlite3.connect(path) as conn:
+    with db.opened(path) as conn:
         return {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
 
 
 def old_history(path: Path, ids):
     """A history.db as v4.3.0 wrote it: only the columns it knew (no uuid, sensations, deleted_utc)."""
     old = [(n, t) for n, t in COLUMNS if n not in ('uuid', 'sensations', 'deleted_utc')]
-    with sqlite3.connect(path) as conn:
+    with db.opened(path) as conn:
         conn.execute(f"CREATE TABLE activities ({', '.join(f'{n} {t}' for n, t in old)})")
         for i, activity_id in enumerate(ids):
             conn.execute('INSERT INTO activities (id, source, type, start_utc, rpe, feeling) VALUES (?, ?, ?, ?, ?, ?)',
@@ -52,7 +52,7 @@ class DatabaseTests(unittest.TestCase):
         old_history(legacy, ['strava:1', 'strava:2', 'app:session_20261113_130000'])
         before = legacy.read_bytes()
         path = db.migrate(self.folder / 'coach.db')
-        with sqlite3.connect(path) as conn:
+        with db.opened(path) as conn:
             rows = conn.execute('SELECT id, uuid, rpe, feeling FROM activities ORDER BY id').fetchall()
         self.assertEqual([r[0] for r in rows], ['app:session_20261113_130000', 'strava:1', 'strava:2'])
         self.assertEqual(len({r[1] for r in rows}), 3)                     # each one its own UUID
@@ -62,7 +62,7 @@ class DatabaseTests(unittest.TestCase):
         old_history(self.folder / 'other.db', ['strava:9'])                # a later change of history.db...
         db._ready.clear()
         db.migrate(path)
-        with sqlite3.connect(path) as conn:                                # ...is not imported again
+        with db.opened(path) as conn:                                # ...is not imported again
             self.assertEqual(conn.execute('SELECT COUNT(*) FROM activities').fetchone()[0], 3)
 
     def test_a_damaged_old_history_does_not_stop_the_app(self):
@@ -83,14 +83,16 @@ class DatabaseTests(unittest.TestCase):
     def test_a_database_from_an_older_version_is_copied_before_migrating(self):
         path = db.migrate(self.folder / 'coach.db')
 
-        def v2(conn):
+        current, following = db.SCHEMA_VERSION, db.SCHEMA_VERSION + 1
+
+        def next_one(conn):
             conn.execute('CREATE TABLE extra (id TEXT PRIMARY KEY)')
-        with mock.patch.dict(db.MIGRATIONS, {2: v2}), mock.patch.object(db, 'SCHEMA_VERSION', 2):
+        with mock.patch.dict(db.MIGRATIONS, {following: next_one}), mock.patch.object(db, 'SCHEMA_VERSION', following):
             db._ready.clear()
             db.migrate(path)
         self.assertIn('extra', tables(path))
-        self.assertEqual(db.meta(path, 'schema_version'), '2')
-        backups = list(self.folder.glob('coach.db.bak-v1-*'))
+        self.assertEqual(db.meta(path, 'schema_version'), str(following))
+        backups = list(self.folder.glob(f'coach.db.bak-v{current}-*'))
         self.assertEqual(len(backups), 1)
         self.assertNotIn('extra', tables(backups[0]))                      # the copy is the database before
 
@@ -100,16 +102,17 @@ class DatabaseTests(unittest.TestCase):
         def broken(conn):
             conn.execute('CREATE TABLE half (id TEXT)')
             raise RuntimeError('boom')
-        with mock.patch.dict(db.MIGRATIONS, {2: broken}), mock.patch.object(db, 'SCHEMA_VERSION', 2):
+        following = db.SCHEMA_VERSION + 1
+        with mock.patch.dict(db.MIGRATIONS, {following: broken}), mock.patch.object(db, 'SCHEMA_VERSION', following):
             db._ready.clear()
             with self.assertRaises(RuntimeError):
                 db.migrate(path)
-        self.assertEqual(db.meta(path, 'schema_version'), '1')
+        self.assertEqual(db.meta(path, 'schema_version'), str(following - 1))
         self.assertNotIn('half', tables(path))
 
     def test_a_database_from_a_newer_app_is_not_touched(self):
         path = db.migrate(self.folder / 'coach.db')
-        with sqlite3.connect(path) as conn:
+        with db.opened(path) as conn:
             conn.execute("UPDATE meta SET value = '99' WHERE key = 'schema_version'")
         db._ready.clear()
         with self.assertRaises(db.NewerDatabase):
@@ -117,7 +120,7 @@ class DatabaseTests(unittest.TestCase):
 
     def test_deleting_an_activity_takes_its_session_rows_with_it(self):
         path = db.migrate(self.folder / 'coach.db')
-        with db.connect(path) as conn:
+        with db.opened(path) as conn:
             conn.execute("INSERT INTO activities (id, uuid, source, type) VALUES ('app:s', 'u', 'app', 'virtual_ride')")
             conn.execute("INSERT INTO sessions (activity_id, csv) VALUES ('app:s', 's.csv')")
             conn.execute("INSERT INTO sharing_exclusions VALUES ('app:s', '2026-11-16T10:00:00+00:00')")

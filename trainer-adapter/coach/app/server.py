@@ -244,7 +244,7 @@ class Handler(BaseHTTPRequestHandler):
             from coach.app.routes_store import list_routes
             from coach.session.session import list_sessions
             ride = state.ride
-            routes = list_routes(self.admin.env.routes_dir)
+            routes = list_routes(self.admin.env.routes_dir, db_path=self.admin.env.history_db)
             rides = {}                                    # route file -> its sessions, newest first
             for session in list_sessions(self.admin.env.record_dir):
                 for ridden in session.get('routes') or []:
@@ -271,7 +271,7 @@ class Handler(BaseHTTPRequestHandler):
             from coach.session.route import RouteError
             from urllib.parse import unquote
             try:
-                route = load_route(self.admin.env.routes_dir, unquote(path[len('/routes/'):]))
+                route = load_route(self.admin.env.routes_dir, unquote(path[len('/routes/'):]), self.admin.env.history_db)
             except (FileNotFoundError, RouteError):
                 self.send_error(404, 'Route not found or not usable')
                 return
@@ -505,7 +505,7 @@ class Handler(BaseHTTPRequestHandler):
                 from coach.app.routes_store import load_route
                 from coach.session.gpx_activity import NotEnoughData, build_replay
                 try:
-                    route = load_route(self.admin.env.routes_dir, replay.group(1))
+                    route = load_route(self.admin.env.routes_dir, replay.group(1), self.admin.env.history_db)
                 except FileNotFoundError:
                     self.send_error(404, 'No such route')
                     return
@@ -520,18 +520,18 @@ class Handler(BaseHTTPRequestHandler):
                 from coach.app.routes_store import rename
                 body = self.read_json()
                 try:
-                    self.respond(rename(self.admin.env.routes_dir, body.get('file'), body.get('name')))
+                    self.respond(rename(self.admin.env.routes_dir, body.get('file'), body.get('name'), self.admin.env.history_db))
                 except FileNotFoundError:
                     self.send_error(404, 'No such route')
                 return
             if path == '/routes/generate' and self.admin is not None:
                 from coach.app.routes_store import generate
-                self.respond(generate(self.admin.env.routes_dir, self.read_json()))
+                self.respond(generate(self.admin.env.routes_dir, self.read_json(), self.admin.env.history_db))
                 return
             if path == '/routes' and self.admin is not None:
                 from coach.app.routes_store import MAX_UPLOAD_BYTES as MAX_GPX, save_upload as save_route
                 name = (parse_qs(urlsplit(self.path).query).get('name') or [''])[0]
-                self.respond(save_route(self.admin.env.routes_dir, name, self.read_body(MAX_GPX)), 201)
+                self.respond(save_route(self.admin.env.routes_dir, name, self.read_body(MAX_GPX), self.admin.env.history_db), 201)
                 return
             if path in ('/workout/ramp/start', '/workout/structured/start', '/workout/stop', '/workout/ftp/save',
                         '/workout/clear') and self.admin is not None:
@@ -557,7 +557,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not isinstance(file, str):
                     raise ValueError('file must be the name of a route')
                 try:
-                    route = load_route(self.admin.env.routes_dir, file)
+                    route = load_route(self.admin.env.routes_dir, file, self.admin.env.history_db)
                 except FileNotFoundError:
                     self.send_error(404, 'Route not found')
                     return
@@ -675,7 +675,7 @@ def _delete_file(self, path):
             if ride is not None and ride.route is not None and ride.route.file == file and not ride.route_finished:
                 self.send_error(409, 'You are riding this route: leave it first')
                 return
-            self.respond(delete_route(env.routes_dir, file))
+            self.respond(delete_route(env.routes_dir, file, env.history_db))
             return
         stem = path[len('/sessions/'):]
         session = self.session

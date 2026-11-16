@@ -1,6 +1,6 @@
 # ADR-003 — Base de datos local (SQLite) y qué se queda como fichero
 
-**Estado:** Aceptado (16-11-2026). **Fase 1 hecha**: `coach.db` con todo el esquema y las actividades de `history.db`. Fase 2: los JSON a sus tablas. Fase 3: pantallas de privacidad. La parte de compartir está en
+**Estado:** Aceptado (16-11-2026). **Fase 1 hecha**: `coach.db` con todo el esquema y las actividades de `history.db`. **Fase 2a y 2b hechas**: perfil, ajustes y catálogo de rutas (esquema v2: `routes.file` no único, con `sha256`). Fase 2c: el resumen de cada sesión. Fase 3: pantallas de privacidad. La parte de compartir está en
 `docs/PENDIENTES-sin-rodillo.md`, sección 10d.
 
 ## Contexto
@@ -122,7 +122,8 @@ erDiagram
     }
     routes {
         text id PK "uuid"
-        text file "el GPX"
+        text file "el GPX (puede repetirse: v2)"
+        text sha256 "huella del GPX (v2)"
         text name "el elegido"
         text gpx_name
         int generated

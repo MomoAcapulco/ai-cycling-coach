@@ -32,7 +32,9 @@ class ProfileTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / 'profile.json'
             path.write_text('{"profile": {"riderWeightKg": 80, "bikeWeightKg": 9.5}}')
-            profile, saved = ProfileStore(path).load()
+            from coach.app.legacy_json import _Backup, import_profile
+            import_profile(path, Path(folder) / 'coach.db', _Backup(Path(folder)))
+            profile, saved = ProfileStore(Path(folder) / 'coach.db').load()
             self.assertEqual((saved, profile.bike_type), (True, 'ROAD'))
 
 
