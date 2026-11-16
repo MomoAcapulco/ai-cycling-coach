@@ -3,7 +3,7 @@
     trainer-adapter/.venv/bin/python trainer-adapter/tools/import_strava.py ~/Downloads/export_12345678.zip
 
 Read straight from the ZIP; the history and copies of the activity files go to the data home
-(ai-cycling-coach-data/history.db and history/files), never to the project. Running it again only adds what is
+(ai-cycling-coach-data/coach.db and history/files), never to the project. Running it again only adds what is
 new. Afterwards the ZIP can be deleted.
 """
 import argparse

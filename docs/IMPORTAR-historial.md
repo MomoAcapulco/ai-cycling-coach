@@ -1,7 +1,7 @@
 # Importar tu historial (Strava)
 
 El historial junta tus sesiones en el rodillo (entran solas) con lo que haces fuera: bici en la calle, carrera,
-fuerza… Se guarda en tu carpeta de datos (`ai-cycling-coach-data/history.db` y `history/files`), nunca en el
+fuerza… Se guarda en tu carpeta de datos (`ai-cycling-coach-data/coach.db` y `history/files`; hasta el 16-11 era `history.db`), nunca en el
 repositorio. Lo verás en la página **Historial**.
 
 ## 1. Pide tu exportación a Strava

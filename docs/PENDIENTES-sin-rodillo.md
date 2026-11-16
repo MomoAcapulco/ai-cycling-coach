@@ -16,7 +16,7 @@ Lo que se puede hacer y probar sin el rodillo, en orden. Lo que necesita el rodi
 | 8 | **Método del desnivel acumulado de las rutas**: decidirlo con GPX reales frente al desnivel oficial | Hecho (15-11): media de 50 m, a menos del 1 % de Strava en tus 3 rutas (abajo) |
 | 9 | **Rutas generadas**: crear rutas a partir de distancia, desnivel, número de subidas… (abajo) | Hecho (16-11): «a medida» y «como mi carrera», probado con tus 5 GPX; falta rodar una con el rodillo |
 | 10 | **Lo que necesita la IA además de 4–7**: tu objetivo y calendario, tus salidas en la calle, cómo te sientes, historial consultable, reglas y privacidad (abajo) | **10a hecha (15-11)**: historial + importación de Strava (118 actividades). **Sensaciones hechas (16-11)**: esfuerzo 1–10 y nota por sesión. Faltan objetivo y calendario, reglas |
-| 10c | **Base de datos SQLite** para lo que hoy son JSON sueltos (resúmenes de sesión, esfuerzo, entrenamientos, nombres de rutas, perfil, ajustes), migrando tus datos sin perder nada; las series (CSV) y los GPX siguen como ficheros (abajo) | Pendiente; antes de la 11 |
+| 10c | **Base de datos SQLite** para lo que hoy son JSON sueltos (resúmenes de sesión, esfuerzo, entrenamientos, nombres de rutas, perfil, ajustes), migrando tus datos sin perder nada; las series (CSV) y los GPX siguen como ficheros (abajo) | **Fase 1 hecha (16-11)**: `coach.db` con el esquema completo (ADR-003) y tus 122 actividades. Fase 2: los JSON a sus tablas; fase 3: privacidad. Antes de la 11 |
 | 11 | **IA, fase 1: análisis después de cada sesión** | Tras la 4, la 5 y parte de la 10 |
 | 12 | **IA, fase 2: planificación** (semana, ajustes según cómo vas, puesta a punto para la carrera) | Tras la 6, la 7 y la 10 |
 | 13 | **Visual 1: mapa en movimiento** con tu posición en la ruta | Pendiente |
@@ -145,7 +145,7 @@ Configuración propuesta (todo opcional menos la distancia):
 
 ## 10c. Base de datos (SQLite)
 
-Hoy: el historial ya está en SQLite (`history.db`); el resto son JSON sueltos (un resumen por sesión, perfil, ajustes,
+Diseño en `docs/adr/ADR-003-base-de-datos.md`. Fase 1 hecha (16-11): el historial está en `coach.db`; el resto siguen siendo JSON sueltos (un resumen por sesión, perfil, ajustes,
 `routes/names.json`, `devices.json`).
 
 - **SQLite, no NoSQL**: un solo fichero, sin servidor ni instalación, se copia como cualquier fichero, aguanta un
@@ -181,6 +181,9 @@ alguien que envía una copia. Nada se sincroniza.
 - Las series de la app ya llevan `rideDistanceKm`, `altitudeM` y `roadGradePercent`, así que el paquete se hace
   con eso y sin `lat`/`lon`.
 - Las rutas se comparten como **perfil** (distancia → altitud cada 10 m), sin coordenadas.
+- **Altitud relativa**: cada sesión y cada perfil empiezan en 0 m. La altitud absoluta acota la zona (si sales
+  siempre a 600 m) y a la IA le basta con cuánto se sube. El desnivel sale de la altitud del GPX/FIT (barómetro o GPS),
+  que es un dato aparte de las coordenadas: no hacen falta para enviarlo.
 - Ojo: la salida y la llegada suelen ser tu casa. Por eso no hay coordenadas ni recortadas.
 
 **Pantalla «Compartir mis datos»** (Ajustes), solo si el usuario la abre:
@@ -193,7 +196,13 @@ alguien que envía una copia. Nada se sincroniza.
    - esfuerzo percibido 1–10 (sí);
    - **notas de texto (no)**: la gente escribe cosas personales;
    - entrenamientos y tests de FTP (sí);
-   - perfil **por rangos**: peso de 10 en 10 kg, edad por décadas, FTP de 20 en 20 W, sexo si quiere (sí);
+   - perfil **por rangos**: **peso de 5 en 5 kg** (de 10 en 10, el W/kg fallaría hasta un 6 %), **edad de 5 en 5 años**,
+     **altura de 5 en 5 cm**, **sexo** si quiere (sí). Juntos y exactos casi identifican a alguien;
+     por rangos, no;
+   - **FTP exacto** (sí), con su origen (test de rampa, estimado con el historial o a mano), si es de rodillo o de calle
+     y cada cambio con su día relativo. Por rangos no: con 150 W, 20 W son un 13 %, y todos los objetivos y zonas
+     dependen de él. No añade riesgo: la potencia de cada segundo ya va exacta;
+   - **sensaciones con casillas** (piernas, motivación, molestias, «dormí mal») (sí); la nota de texto, nunca;
    - perfiles de las rutas, sin coordenadas (sí).
 3. **Vista previa**: cuántas sesiones, qué fechas y un ejemplo de las filas tal como se enviarán.
 4. **Mínimo de datos**, contado solo con lo que haya marcado. Propuesta:
@@ -204,11 +213,30 @@ alguien que envía una copia. Nada se sincroniza.
    Te avisamos cuando tengas suficientes.» El paquete no se genera, y el aviso es opcional y se puede apagar.
 5. **Generar el paquete** en la carpeta de datos. Lo **envía el usuario** (correo o subida): la app no manda nada sola.
 
+**Lo que necesita la IA y aún no se guarda** (decidido 16-11): las tablas se crean en la migración (10c), aunque las
+pantallas para rellenarlas lleguen después, para no migrar dos veces.
+
+| Tabla / campo | Qué | Para qué |
+|---|---|---|
+| `goals` | Objetivo: tipo de carrera (maratón BTT, 24 h…), distancia, desnivel, fecha y su GPX | Planificar hacia algo concreto |
+| `event_results` | Resultado: tiempo, si terminó, esfuerzo, cómo fue | **Lo que la IA aprende**: qué preparación dio qué resultado |
+| `ftp_tests` | Cada test de FTP con su fecha y su resultado | La otra respuesta: si el FTP sube, el plan funciona |
+| `ftp_estimates` | El FTP que **estima la app** (aviso de FTP) cada vez: día, valor de rodillo y de calle, método (modelo CP o mejor esfuerzo largo), CP, W′, esfuerzos usados, versión del algoritmo, qué se propuso (subir / test) y si se aceptó | Comparado con los tests de muchos ciclistas mide cuánto se equivoca el modelo y cómo mejorarlo; y qué vio y decidió el usuario. En la central se podría recalcular, pero el modelo cambiará: hay que guardar lo que se calculó entonces |
+| `ai_recommendations` | Qué propuso la IA y si se hizo | Distinguir «el plan no sirvió» de «no se siguió» |
+| `health_days` | Días de enfermedad, lesión o viaje (opcional) | Que un hueco o un bajón no parezca falta de forma |
+| `availability` | Días y horas para entrenar | Que el plan quepa en la semana (solo local) |
+| `sessions.sensations` | Sensaciones con casillas: piernas (frescas/normales/pesadas), motivación (alta/normal/baja), molestias (rodilla, espalda, otra), «dormí mal» | El esfuerzo 1–10 no dice por qué; la nota de texto no se comparte |
+| `sessions.trainer_difficulty` | La dificultad de la pendiente del rodillo de esa sesión (y el factor de bajadas) | Un 8 % al 50 % no es un 8 % al 100 % |
+| `sessions.sensor_kinds` | Tipo de sensor: potenciómetro o rodillo, banda o pulso de muñeca | Saber qué datos son fiables (nunca modelo ni serial) |
+| `profile` | Edad (o año de nacimiento), altura y sexo, opcionales | Pulso máximo y recuperación (edad), resistencia al aire (altura), fisiología (sexo) |
+
+Todo se guarda completo en local; a la central solo va con permiso, por rangos y sin texto libre.
+
 **Anonimización** (y un test que lo comprueba con `mask_personal_data.py`):
 - **Donante**: un identificador aleatorio que se crea al compartir por primera vez, sin nombre ni correo. Con él se
   puede pedir el borrado.
-- **Tiempo**: segundos desde el inicio de cada sesión; la fecha, como mucho la semana (`2026-W46`), para la carga
-  CTL/ATL.
+- **Tiempo**: segundos desde el inicio de cada sesión, y para la fecha, **días desde la primera sesión compartida**
+  (día 0, 3, 4…) más el día de la semana. Por semanas (`2026-W46`) no se podría calcular la fatiga (ATL), que va por días.
 - **Fuera**: GPS; identificadores BLE, seriales y nombres de dispositivos; nombres de los ficheros; nombres de las
   rutas (pueden decir dónde vives); el texto del log del rodillo; el peso que va en la respuesta 512.
 - **Dispositivos**, solo por tipo: «rodillo con Zwift Cog» o «banda de pulso».

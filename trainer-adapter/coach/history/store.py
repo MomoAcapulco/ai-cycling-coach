@@ -1,6 +1,7 @@
 """Activity history: every ride, run or workout, from this app and from outside (Strava export, FIT files).
 
-A local SQLite database (``history.db`` in the data home, override with HISTORY_DB), never in the repository. One
+The ``activities`` table of the local database (``coach.db`` in the data home, coach/app/db.py; until v4.3.0 it was
+``history.db``), never in the repository. One
 row per activity with its summary; the original file is copied next to it (``history/files``) so the numbers can
 be recomputed if a formula changes. Importing again never duplicates: the id is stable (``strava:<id>``,
 ``app:<session>``, ``fit:<hash>``).
@@ -16,6 +17,7 @@ from pathlib import Path
 from threading import Lock
 from typing import Optional
 
+from coach.app import db as db_module
 from coach.session.metrics import SessionMetrics
 
 COLUMNS = (
@@ -32,6 +34,8 @@ COLUMNS = (
     ('mmp', 'TEXT'),
     # how it felt: perceived effort 1–10 (this app's sessions, or Strava's «Esfuerzo percibido») and a note
     ('rpe', 'REAL'), ('feeling', 'TEXT'),
+    # schema v1 (ADR-003): a UUID for sharing without clashes, sensations with check boxes, and the deletion date
+    ('uuid', 'TEXT'), ('sensations', 'TEXT'), ('deleted_utc', 'TEXT'),
 )
 TYPES = ('ride', 'virtual_ride', 'run', 'strength', 'workout', 'other')
 GAP_S = 3
@@ -42,21 +46,14 @@ class HistoryStore:
         self.path = Path(path).expanduser()
         self.files = self.path.parent / 'history' / 'files'
         self.lock = Lock()
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        with self._db() as db:
-            db.execute(f"CREATE TABLE IF NOT EXISTS activities ({', '.join(f'{n} {t}' for n, t in COLUMNS)})")
-            present = {r[1] for r in db.execute('PRAGMA table_info(activities)')}
-            for name, kind in COLUMNS:                      # databases created by an earlier version
-                if name not in present:
-                    db.execute(f'ALTER TABLE activities ADD COLUMN {name} {kind}')
+        db_module.migrate(self.path)      # creates or brings up to date the whole database (ADR-003)
 
     @classmethod
     def default(cls):
-        from coach.app.paths import data_file
-        return cls(data_file('history.db', 'HISTORY_DB'))
+        return cls(db_module.default_path())
 
     def _db(self):
-        return sqlite3.connect(self.path)
+        return db_module.connect(self.path)
 
     def has(self, activity_id: str) -> bool:
         with self.lock, self._db() as db:
@@ -68,6 +65,7 @@ class HistoryStore:
             raise ValueError(f"unknown activity type {row.get('type')}")
         row = {**{name: None for name, _ in COLUMNS}, **row,
                'imported_utc': datetime.now(timezone.utc).isoformat(timespec='seconds')}
+        row['uuid'] = row['uuid'] or db_module.new_id()
         names = [name for name, _ in COLUMNS]
         with self.lock, self._db() as db:
             cursor = db.execute(f"INSERT OR IGNORE INTO activities ({', '.join(names)}) VALUES "
