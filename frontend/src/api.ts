@@ -47,6 +47,12 @@ const json = (body: unknown): RequestInit => ({
   body: JSON.stringify(body),
 });
 
+/** Lists come a page at a time (the server counts the rest). */
+export const PAGE = 20;
+export type Page = { total: number; limit: number | null; offset: number };
+export type RaceRef = Pick<RouteSummary, 'file' | 'name' | 'distanceKm' | 'elevationGainM' | 'maxGradePercent'>;
+export type RoutesPage = Page & { routes: RouteSummary[]; races: RaceRef[]; current: string | null; available: boolean };
+
 export const api = {
   telemetry: () => request<Telemetry>('/telemetry'),
   replaySession: () => request<Session>('/replay/session'),
@@ -68,7 +74,8 @@ export const api = {
   saveProfile: (profile: Partial<RiderProfile>) => request<ProfileState>('/admin/profile', json(profile)),
   sessionAction: (action: 'start' | 'pause' | 'resume' | 'finish') =>
     request<Telemetry & Partial<SessionSummary>>(`/session/${action}`, { method: 'POST' }),
-  sessions: () => request<{ sessions: SessionSummary[] }>('/sessions'),
+  sessions: (offset = 0, hideTests = true, limit = PAGE) =>
+    request<Page & { sessions: SessionSummary[]; tests: number }>(`/sessions?limit=${limit}&offset=${offset}${hideTests ? '&tests=hide' : ''}`),
   devices: () => request<DevicesState>('/devices'),
   forgetDevice: (role: string, address?: string) =>
     request<DevicesState>(`/devices/${role}${address ? `?address=${encodeURIComponent(address)}` : ''}`, { method: 'DELETE' }),
@@ -79,11 +86,14 @@ export const api = {
   workoutLibrary: () => request<WorkoutLibrary>('/workout/library'),
   startWorkout: (id: string) => request<Telemetry>('/workout/structured/start', json({ id })),
   clearWorkout: () => request<{ workout: null }>('/workout/clear', { method: 'POST' }),
-  history: () => request<{ activities: Activity[]; counts: Record<string, number>; database: string }>('/history'),
+  history: (offset = 0, type: string | null = null, limit = PAGE) =>
+    request<Page & { activities: Activity[]; counts: Record<string, number>; types: Record<string, number>; type: string | null }>(
+      `/history?limit=${limit}&offset=${offset}${type ? `&type=${encodeURIComponent(type)}` : ''}`),
   historyLoad: (days = 180) => request<LoadReport>(`/history/load?days=${days}`),
   ftpAdvice: () => request<FtpAdvice>('/history/ftp'),
-  historyWeeks: () => request<{ weeks: HistoryWeek[] }>('/history/weeks'),
-  routes: () => request<{ routes: RouteSummary[]; folder: string; current: string | null; available: boolean }>('/routes'),
+  historyWeeks: (type: string | null = null) =>
+    request<{ weeks: HistoryWeek[] }>(`/history/weeks${type ? `?type=${encodeURIComponent(type)}` : ''}`),
+  routes: (offset = 0, limit = PAGE) => request<RoutesPage>(`/routes?limit=${limit}&offset=${offset}`),
   uploadRoute: (file: File) =>
     request<RouteSummary>(`/routes?name=${encodeURIComponent(file.name)}`, {
       method: 'POST', headers: { 'Content-Type': 'application/gpx+xml' }, body: file,

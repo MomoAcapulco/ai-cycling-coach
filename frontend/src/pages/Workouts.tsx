@@ -49,7 +49,7 @@ export function Workouts({ data }: { data: Telemetry | null }) {
       </Help></h1>
           <p className="muted">
             {ftp ? <>Objetivos calculados con tu FTP de <strong>{ftp} W</strong>{library?.ftpSource === 'history' ? ' (estimado con tu historial)' : ''}.</>
-              : library ? <>Sin FTP no hay objetivos: haz el <a href="#/">test de FTP</a> en el Panel o ponlo en <a href="#/ajustes">Ajustes</a>.</> : 'Cargando…'}
+              : library ? <>Sin FTP no hay objetivos: haz el <a href="#/">test de FTP</a> en el Panel o ponlo en <a href="#/ajustes/perfil">Ajustes</a>.</> : 'Cargando…'}
           </p>
         </div>
       </div>

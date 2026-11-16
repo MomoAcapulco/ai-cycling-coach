@@ -205,8 +205,11 @@ def session_to_fit(csv_path: Path, summary: dict) -> bytes:
     return w.to_bytes()
 
 
-def session_fit(folder: Path, stem: str) -> bytes:
-    """The FIT of session ``stem`` (session_YYYYmmdd_HHMMSS) from its files in ``folder``."""
+def session_fit(folder: Path, stem: str, db_path=None) -> bytes:
+    """The FIT of session ``stem`` (session_YYYYmmdd_HHMMSS): its CSV in ``folder`` and its summary in the database."""
+    from coach.session.session_store import SessionStore
     folder = Path(folder)
-    summary = json.loads((folder / f'{stem}.json').read_text(encoding='utf-8'))
+    summary = SessionStore(db_path).get(stem)
+    if summary is None:
+        raise KeyError(f'no session {stem}')
     return session_to_fit(folder / summary.get('csv', f'{stem}.csv'), summary)

@@ -226,7 +226,7 @@ class RouteEndpointTests(unittest.TestCase):
         from coach.app.settings import Settings
         self.temp = tempfile.TemporaryDirectory()
         folder = Path(self.temp.name)
-        self.env = EnvConfig(record_dir=folder / 'rec', routes_dir=folder / 'routes')
+        self.env = EnvConfig(history_db=Path(folder / 'rec') / 'coach.db', record_dir=folder / 'rec', routes_dir=folder / 'routes')
         self.runtime = AdapterRuntime(self.env, Settings(mode='SIMULATOR'), start_workers=False).start()
         self.httpd = make_server('127.0.0.1', 0, self.runtime)
         self.base = f'http://127.0.0.1:{self.httpd.server_address[1]}'

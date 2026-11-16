@@ -1,19 +1,26 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../api';
-import type { AdminState, DevicesState, Mode, Settings } from '../types';
+import type { AdminState, DevicesState, Settings } from '../types';
 import { exitReplay, LIVE_LABEL, lastLiveMode } from '../liveMode';
 import { DevicesSection } from '../components/DevicesSection';
 import { ProfileSection } from '../components/ProfileSection';
 import { Help } from '../components/Help';
 import { toast } from '../toast';
 
-const MODES: { mode: Mode; title: string; text: string }[] = [
-  { mode: 'WAHOO', title: 'Rodillo real', text: 'Lee el rodillo por Bluetooth. Sin órdenes de resistencia.' },
-  { mode: 'SIMULATOR', title: 'Simulador', text: 'Datos inventados para probar la aplicación.' },
-];
 
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
+/** Ajustes is split in pages (#/ajustes/<id>); Privacidad comes with sharing data (docs/PENDIENTES-sin-rodillo.md 10d). */
+const TABS = [
+  { id: 'perfil', label: 'Perfil', title: 'Tu perfil de ciclista' },
+  { id: 'rodillo', label: 'Rodillo y dispositivos', title: 'El rodillo, los sensores y los mandos' },
+] as const;
+type Tab = typeof TABS[number]['id'];
+const readTab = (): Tab => {
+  const sub = window.location.hash.replace(/^#\/?ajustes\/?/, '');
+  return (TABS.find((t) => t.id === sub)?.id) ?? 'perfil';
+};
 
 export function Admin() {
   const [admin, setAdmin] = useState<AdminState | null>(null);
@@ -21,6 +28,12 @@ export function Admin() {
   const [devices, setDevices] = useState<DevicesState | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [tab, setTab] = useState<Tab>(readTab);
+  useEffect(() => {
+    const onChange = () => setTab(readTab());
+    window.addEventListener('hashchange', onChange);
+    return () => window.removeEventListener('hashchange', onChange);
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -83,10 +96,14 @@ export function Admin() {
       <div className="heading">
         <div>
           <p className="eyebrow">AJUSTES</p>
-          <h1>Tu perfil, la fuente de datos y los dispositivos</h1>
+          <h1>{TABS.find((t) => t.id === tab)?.title}</h1>
           <p className="muted">Los cambios se aplican al momento, sin reiniciar.</p>
         </div>
       </div>
+      <nav className="tabs" aria-label="Apartados de Ajustes">
+        {TABS.map((t) => <a key={t.id} href={`#/ajustes/${t.id}`} className={t.id === tab ? 'active' : ''}
+          aria-current={t.id === tab ? 'page' : undefined}>{t.label}</a>)}
+      </nav>
 
       {error && <div className="alert">{error}</div>}
       {locked && (
@@ -95,26 +112,21 @@ export function Admin() {
         </div>
       )}
 
-      <ProfileSection />
+      {tab === 'perfil' && <ProfileSection />}
+      {tab === 'rodillo' && <>
 
-      <section className="panel">
-        <div className="panel-heading"><h2>Fuente de datos</h2><span>ACTUAL: {inReplay ? 'REPLAY' : MODES.find((m) => m.mode === current.mode)?.title.toUpperCase() ?? current.mode}</span></div>
-        {inReplay && (
-          <div className="notice">Estás viendo un replay ({current.replayFile ?? '—'}).{' '}
-            <button disabled={busy || locked} onClick={() => { setBusy(true); exitReplay().then(() => load()).catch((e) => toast.error(`No se pudo salir del replay: ${message(e)}`)).finally(() => setBusy(false)); }}>
-              Salir del replay (volver a {LIVE_LABEL[lastLiveMode()]})</button>
-          </div>
-        )}
-        <div className="mode-cards" role="radiogroup" aria-label="Fuente de datos">
-          {MODES.map(({ mode, title, text }) => (
-            <button key={mode} role="radio" aria-checked={draft.mode === mode} disabled={locked}
-              className={`mode-card ${draft.mode === mode ? 'selected' : ''}`} onClick={() => set({ mode })}>
-              <strong>{title}</strong><span>{text}</span>
-            </button>
-          ))}
+      {/* The app reads the trainer. A replay is opened from Sessions or Routes; the simulator is for development
+          only (TRAINER_MODE=SIMULATOR in .env): neither is chosen here, but both can be left from here. */}
+      {current.mode !== 'WAHOO' && (
+        <div className="notice">
+          {inReplay ? <>Estás viendo un replay ({current.replayFile ?? '—'}).</> : <>Estás en el simulador (modo de desarrollo, del fichero .env).</>}{' '}
+          <button disabled={busy || locked} onClick={() => {
+            setBusy(true);
+            (inReplay ? exitReplay() : api.saveSettings({ mode: 'WAHOO' })).then(() => load())
+              .catch((e) => toast.error(`No se pudo cambiar: ${message(e)}`)).finally(() => setBusy(false));
+          }}>{inReplay ? `Salir del replay (volver a ${LIVE_LABEL[lastLiveMode()]})` : 'Usar el rodillo real'}</button>
         </div>
-        <p className="tiny">Para ver una sesión o una ruta en replay: <a href="#/sesiones">Sesiones</a> → «Ver en replay», o <a href="#/rutas">Rutas</a>.</p>
-      </section>
+      )}
 
 
       <section className="panel">
@@ -129,31 +141,27 @@ export function Admin() {
         </label>
       </section>
 
-      {draft.mode === 'WAHOO' && (
-        <section className="panel">
-          <div className="panel-heading"><h2>Control de marchas del rodillo <Help title="Cómo funciona el control de marchas"><p>
-            24 marchas de Zwift, empieza en la 12. Cada cambio lo confirma el rodillo; sin pedalear no se endurece;
-            al salir vuelve a la 12. La pendiente no cambia. Usa los pesos del perfil del ciclista.
-          </p></Help></h2><span>ZWIFT COG · SOLO RODILLO REAL</span></div>
-          <label className="switch">
-            <input type="checkbox" checked={draft.gearControlEnabled} disabled={locked}
-              onChange={(e) => set({ gearControlEnabled: e.target.checked })} />
-            <span>Las marchas (mandos y botones del panel) cambian la resistencia del rodillo</span>
-          </label>
-          {draft.gearControlEnabled && !draft.zwiftEnabled && <p className="tiny warn">Activa también los mandos Zwift para cambiar con ellos.</p>}
-        </section>
-      )}
+      <section className="panel">
+        <div className="panel-heading"><h2>Control de marchas del rodillo <Help title="Cómo funciona el control de marchas"><p>
+          24 marchas de Zwift, empieza en la 12. Cada cambio lo confirma el rodillo; sin pedalear no se endurece;
+          al salir vuelve a la 12. La pendiente no cambia. Usa los pesos del perfil del ciclista.
+        </p></Help></h2><span>ZWIFT COG · CON EL RODILLO</span></div>
+        <label className="switch">
+          <input type="checkbox" checked={draft.gearControlEnabled} disabled={locked}
+            onChange={(e) => set({ gearControlEnabled: e.target.checked })} />
+          <span>Las marchas (mandos y botones del panel) cambian la resistencia del rodillo</span>
+        </label>
+        {draft.gearControlEnabled && !draft.zwiftEnabled && <p className="tiny warn">Activa también los mandos Zwift para cambiar con ellos.</p>}
+      </section>
 
-      {draft.mode === 'WAHOO' && (
-        <section className="panel">
-          <div className="panel-heading"><h2>Captura Bluetooth en bruto</h2><span>DIAGNÓSTICO · SOLO RODILLO REAL</span></div>
-          <label className="switch">
-            <input type="checkbox" checked={draft.recordEnabled} disabled={locked} onChange={(e) => set({ recordEnabled: e.target.checked })} />
-            <span>Guardar también todos los mensajes Bluetooth de cada sesión (para analizar problemas)</span>
-          </label>
-          <p className="tiny">Las sesiones se inician y terminan desde el Panel; el CSV de la sesión se guarda siempre.</p>
-        </section>
-      )}
+      <section className="panel">
+        <div className="panel-heading"><h2>Captura Bluetooth en bruto</h2><span>DIAGNÓSTICO · CON EL RODILLO</span></div>
+        <label className="switch">
+          <input type="checkbox" checked={draft.recordEnabled} disabled={locked} onChange={(e) => set({ recordEnabled: e.target.checked })} />
+          <span>Guardar también todos los mensajes Bluetooth de cada sesión (para analizar problemas)</span>
+        </label>
+        <p className="tiny">Las sesiones se inician y terminan desde el Panel; el CSV de la sesión se guarda siempre.</p>
+      </section>
 
       <div className="admin-actions">
         <button className="primary" disabled={busy || !dirty || locked} onClick={() => void apply()}>
@@ -165,6 +173,7 @@ export function Admin() {
       </div>
 
       <DevicesSection initial={devices} />
+      </>}
     </div>
   );
 }

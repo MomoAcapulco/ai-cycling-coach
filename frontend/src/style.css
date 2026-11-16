@@ -172,3 +172,35 @@ h1 .help-icon{font-size:22px;width:30px;height:30px;vertical-align:.15em}
 .help-dialog-text p:last-child{margin-bottom:0}
 .field-name{font-weight:inherit;display:flex;align-items:center}
 .field-name .help-icon{margin-left:4px;width:18px;height:18px;font-size:14px}
+.pager{display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;margin:6px 0 22px;color:#9bb9b0;font-size:13px}
+.pager span{font-variant-numeric:tabular-nums}
+.route-row{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,2fr) auto;align-items:center;gap:14px;width:100%;text-align:left;margin:0 0 8px;padding:13px 16px;border:1px solid #284541;border-radius:12px;background:#102428;color:#d6e6e0;font:inherit;font-size:14px;cursor:pointer}
+.route-row:hover,.route-row:focus-visible{border-color:#3b8063;background:#13302c}
+.route-row strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.route-row span{color:#9bb9b0;font-size:13px;font-variant-numeric:tabular-nums}
+.route-row em{font-style:normal;font-size:11px;letter-spacing:.1em;font-weight:750;color:#83aea3}
+.route-close{float:right;margin:-4px 0 0 12px}
+@media(max-width:550px){.route-row{grid-template-columns:1fr auto}.route-row span{grid-column:1/-1;grid-row:2}}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;border-bottom:1px solid #24403b;margin:0 0 18px}
+.tabs a{padding:10px 14px;color:#9bb9b0;text-decoration:none;font-size:14px;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs a:hover{color:#d6e6e0}
+.tabs a.active{color:#e8f9f1;border-bottom-color:#6ce8af;font-weight:650}
+.replay-panel{position:sticky;top:8px;z-index:20;margin:16px 0 14px;border-color:#8365bc;background:linear-gradient(135deg,#2a2145,#141d2c);box-shadow:0 10px 28px rgba(0,0,0,.45)}
+.replay-main{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.replay-play{width:58px;height:58px;border-radius:50%;border:0;background:#a98cf0;color:#160f2a;font-size:22px;font-weight:800;cursor:pointer;flex:none;display:grid;place-items:center;padding:0}
+.replay-play:hover{background:#bfa6ff}
+.replay-play:disabled{opacity:.6}
+.replay-time{flex:1;min-width:150px}
+.replay-time small{display:block;color:#bda2ff;font-size:11px;letter-spacing:.12em;font-weight:750}
+.replay-time strong{font-size:30px;font-variant-numeric:tabular-nums;letter-spacing:-.02em;color:#f1ecff}
+.replay-time em{font-style:normal;font-size:15px;color:#a99cc9;margin-left:4px}
+.replay-speeds{display:flex;gap:4px;flex-wrap:wrap}
+.replay-speeds button{padding:7px 10px;font-size:13px;border-color:#5a4a86;background:transparent;color:#d8ccff}
+.replay-speeds button.selected{background:#8365bc;border-color:#a98cf0;color:#fff}
+.replay-panel .timeline{accent-color:#a98cf0;width:100%;margin:14px 0 2px}
+.replay-panel .replay-actions{margin-top:10px}
+.replay-exit{border-color:#a98cf0;color:#e6dcff;background:#3a2d63}
+@media(max-width:600px){.replay-panel{top:4px}.replay-time strong{font-size:24px}.replay-exit{width:100%}}
+.replay-panel .replay-actions button{border-color:#a98cf0;background:#3a2d63;color:#e6dcff}   /* all like «Salir del replay» */
+.replay-panel .replay-actions button:hover:not(:disabled),.replay-panel .replay-speeds button:hover:not(:disabled){background:#43367a}
+.replay-panel .replay-speeds button.selected:hover:not(:disabled){background:#9274cc}

@@ -10,6 +10,7 @@ from pathlib import Path
 
 from coach.session.fit_export import FIT_EPOCH, fit_crc, session_fit, session_to_fit
 from coach.session.session import SESSION_FIELDS
+from coach.session.session_store import SessionStore
 
 START = datetime(2026, 11, 13, 13, 0, 0, tzinfo=timezone.utc)
 FMT = {0x00: 'B', 0x02: 'B', 0x83: 'h', 0x84: 'H', 0x86: 'I', 0x8C: 'I'}
@@ -68,7 +69,8 @@ def write_session(folder: Path, rows, **summary):
             'normalizedPowerW': 205.3, 'ftpWatts': 250, 'intensityFactor': 0.821, 'tss': 11.2,
             'elevationGainM': 6.0, 'avgHeartRateBpm': 140.0, 'maxHeartRateBpm': 150.0, 'avgCadenceRpm': 80.0}
     data.update(summary)
-    (folder / f'{stem}.json').write_text(json.dumps(data), encoding='utf-8')
+    (folder / f'{stem}.json').write_text(json.dumps(data), encoding='utf-8')   # as earlier versions left it…
+    SessionStore(folder / 'coach.db').save(data)                                # …and as the app keeps it now
     return stem
 
 
@@ -81,7 +83,7 @@ class FitExportTests(unittest.TestCase):
         self.temp.cleanup()
 
     def export(self, rows, **summary):
-        return session_fit(self.folder, write_session(self.folder, rows, **summary))
+        return session_fit(self.folder, write_session(self.folder, rows, **summary), self.folder / 'coach.db')
 
     def test_structure_crc_and_order(self):
         _size, messages = decode(self.export([row(t) for t in range(60)]))
@@ -166,7 +168,7 @@ class FitDownloadTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             folder = Path(folder)
             stem = write_session(folder, [row(t) for t in range(30)])
-            runtime = AdapterRuntime(EnvConfig(record_dir=folder, routes_dir=folder / 'routes'), Settings(),
+            runtime = AdapterRuntime(EnvConfig(history_db=Path(folder) / 'coach.db', record_dir=folder, routes_dir=folder / 'routes'), Settings(),
                                      start_workers=False).start()
             httpd = make_server('127.0.0.1', 0, runtime)
             Thread(target=httpd.serve_forever, daemon=True).start()

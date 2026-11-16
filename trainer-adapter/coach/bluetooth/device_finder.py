@@ -16,6 +16,8 @@ surely the rider's pair, and the first press puts each in its place.
 The scanner is injected (default: bleak.BleakScanner) so the decision logic is tested without radio: only its
 ``find_device_by_address`` and ``find_device_by_filter`` class methods are used.
 """
+import asyncio
+import contextlib
 from dataclasses import dataclass, field
 from typing import List, Optional
 
@@ -59,16 +61,33 @@ class Claims:
         self.addresses.discard(address.upper())
 
 
+async def _unless_stopped(coro, stop):
+    """Run ``coro``, but cancel it (and return None) as soon as ``stop`` is set: leaving the replay must not wait
+    for a scan of 8 s looking for a controller that is asleep."""
+    if stop is None:
+        return await coro
+    task = asyncio.ensure_future(coro)
+    while not task.done():
+        if stop.is_set():
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await task
+            return None
+        await asyncio.wait({task}, timeout=0.2)
+    return task.result()
+
+
 async def find_for_role(role, registry=None, explicit_id=None, scan_lock=None,
                         claims: Optional[Claims] = None, scanner=None, scan_timeout=SCAN_TIMEOUT,
-                        remembered_timeout=None):
-    """Found, Ambiguous or None (nothing fits). ``remembered_timeout`` is accepted for compatibility only."""
+                        remembered_timeout=None, stop=None):
+    """Found, Ambiguous or None (nothing fits, or ``stop`` was set while scanning). ``remembered_timeout`` is accepted
+    for compatibility only."""
     if scanner is None:
         from bleak import BleakScanner
         scanner = BleakScanner
     if explicit_id:
         async with scanning(scan_lock):
-            device = await scanner.find_device_by_address(explicit_id, timeout=scan_timeout)
+            device = await _unless_stopped(scanner.find_device_by_address(explicit_id, timeout=scan_timeout), stop)
         if device is None:
             return None  # an explicit ID is a choice: never silently replace it with another device
         return Found(device, Classified('configured', device.address, device.name, reason='.env'), 'env')
@@ -94,7 +113,11 @@ async def find_for_role(role, registry=None, explicit_id=None, scan_lock=None,
         return False
 
     async with scanning(scan_lock):
-        await scanner.find_device_by_filter(wanted, timeout=scan_timeout)
+        if stop is not None and stop.is_set():
+            return None
+        await _unless_stopped(scanner.find_device_by_filter(wanted, timeout=scan_timeout), stop)
+        if stop is not None and stop.is_set():
+            return None
 
     present_known = sorted((a for a in seen if a in rank), key=rank.get)
     if present_known:

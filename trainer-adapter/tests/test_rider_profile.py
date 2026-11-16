@@ -50,7 +50,7 @@ class ProfileEndpointTests(unittest.TestCase):
     def test_get_and_post(self):
         with tempfile.TemporaryDirectory() as folder:
             store = ProfileStore(Path(folder) / 'profile.json')
-            runtime = AdapterRuntime(EnvConfig(record_dir=Path(folder)), Settings(), start_workers=False,
+            runtime = AdapterRuntime(EnvConfig(history_db=Path(folder) / 'coach.db', record_dir=Path(folder)), Settings(), start_workers=False,
                                      profile_store=store).start()
             httpd = make_server('127.0.0.1', 0, runtime)
             base = f'http://127.0.0.1:{httpd.server_address[1]}'

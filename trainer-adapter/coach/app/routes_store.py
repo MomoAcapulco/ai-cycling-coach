@@ -148,23 +148,45 @@ def load_route(folder: Path, file: str, db_path=None) -> Route:
     return route
 
 
+def _entry(route: Route) -> dict:
+    """What the list shows of a route (its name is added from the catalogue)."""
+    return {**route.summary(), 'valid': True, 'error': None, 'thumb': route.profile(max_points=80),
+            'recorded': route.timed_points >= 2,      # a recorded ride: its own replay
+            'generated': _is_generated(route.file), 'gpxName': route.gpx_name}
+
+
 def list_routes(folder: Path, db_path=None):
-    """Every GPX of ``folder``, newest first; each valid one is also put in the catalogue (once)."""
+    """Every GPX of ``folder``, newest first. A GPX unchanged since it was catalogued (same size and time) is listed
+    from the database without reading it; a new or changed one is read once and catalogued."""
     from coach.app import db
     folder = Path(folder)
     if not folder.is_dir():
         return []
+    database = _database(db_path)
+    with db.opened(database) as conn:
+        known = {}
+        for file, name, listing, size, mtime in conn.execute(
+                'SELECT file, name, listing, file_size, file_mtime FROM routes WHERE deleted_utc IS NULL '
+                'AND listing IS NOT NULL ORDER BY created_utc'):
+            known[file] = (name, listing, size, mtime)            # the newest row of each file wins
     out = []
     for path in sorted(folder.glob('*.gpx'), key=lambda p: p.stat().st_mtime, reverse=True):
+        stat = path.stat()
+        cached = known.get(path.name)
+        if cached and cached[2] == stat.st_size and cached[3] == stat.st_mtime:
+            entry = json.loads(cached[1])
+            out.append({**entry, 'name': cached[0] or entry['gpxName']})
+            continue
         try:
             route, sha = _parsed(folder, path.name)
-            with _db_lock, db.opened(_database(db_path)) as conn:
-                _register(conn, route, sha)
-            route = load_route(folder, path.name, db_path)
-            out.append({**route.summary(), 'valid': True, 'error': None, 'thumb': route.profile(max_points=80),
-                        'recorded': route.timed_points >= 2,   # a recorded ride: its own replay
-                        'generated': _is_generated(path.name),
-                        'gpxName': route.gpx_name})
+            entry = _entry(route)
+            with _db_lock, db.opened(database) as conn:
+                route_id = _register(conn, route, sha)
+                conn.execute('UPDATE routes SET listing = ?, file_size = ?, file_mtime = ? WHERE id = ?',
+                             (json.dumps({k: v for k, v in entry.items() if k != 'name'}, ensure_ascii=False),
+                              stat.st_size, stat.st_mtime, route_id))
+                name = conn.execute('SELECT name FROM routes WHERE id = ?', (route_id,)).fetchone()[0]
+            out.append({**entry, 'name': name or route.gpx_name})
         except (RouteError, OSError) as exc:
             out.append({'file': path.name, 'name': path.stem, 'valid': False, 'error': str(exc)[:200]})
     return out

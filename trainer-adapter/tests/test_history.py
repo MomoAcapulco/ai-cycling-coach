@@ -32,7 +32,7 @@ class FitReaderTests(unittest.TestCase):
     def test_reads_our_own_export(self):
         with tempfile.TemporaryDirectory() as folder:
             stem = write_session(Path(folder), [row(t) for t in range(60)])
-            fit = read_fit(session_fit(Path(folder), stem))
+            fit = read_fit(session_fit(Path(folder), stem, Path(folder) / 'coach.db'))
         self.assertTrue(fit.crc_ok)
         self.assertEqual(len(fit.records), 60)
         self.assertEqual(fit.records[10]['power'], 200)
@@ -125,7 +125,7 @@ class StravaImportTests(unittest.TestCase):
         self.folder = Path(self.temp.name)
         stem = write_session(self.folder, [row(t) for t in range(60)])
         self.zip = self.folder / 'export.zip'
-        strava_zip(self.zip, session_fit(self.folder, stem))
+        strava_zip(self.zip, session_fit(self.folder, stem, self.folder / 'coach.db'))
         self.store = HistoryStore(self.folder / 'data' / 'history.db')
 
     def tearDown(self):

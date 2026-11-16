@@ -196,7 +196,7 @@ async def controller_worker(state, side, device_id, stop, scan_lock=None, regist
         try:
             state.set_status(side, False, 'SEARCHING')
             found = await find_for_role(f'zwift_{side}', registry=registry, explicit_id=device_id,
-                                        scan_lock=scan_lock, claims=claims, scan_timeout=8)
+                                        scan_lock=scan_lock, claims=claims, scan_timeout=8, stop=stop)
             if found is None:
                 state.set_status(side, False, 'NOT_FOUND')
             elif isinstance(found, Ambiguous):

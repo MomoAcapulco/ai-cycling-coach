@@ -18,4 +18,11 @@ export default defineConfig({
     strictPort: true,
     proxy: { '/api': { target: backendUrl, changeOrigin: true } },
   },
+  // ./start.sh (normal use) serves the built interface with «vite preview»: same address and the same /api proxy.
+  preview: {
+    host: frontendHost,
+    port: frontendPort,
+    strictPort: true,
+    proxy: { '/api': { target: backendUrl, changeOrigin: true } },
+  },
 });

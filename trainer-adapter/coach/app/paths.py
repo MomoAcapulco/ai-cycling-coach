@@ -38,11 +38,15 @@ def diagnostics_dir() -> Path:
 
 
 def migrate_legacy_home(legacy: Path = LEGACY_HOME, target: Path = None) -> list:
-    """Copy files from the old ~/.ai-cycling-coach that do not exist yet in the data home. Returns them."""
+    """Copy files from the old ~/.ai-cycling-coach that do not exist yet in the data home. Returns them.
+
+    Only for a data home that has never been used by the database version (no ``coach.db``): once it exists, the
+    profile and settings live in the database and their JSON files are moved away on purpose (coach/app/legacy_json.py);
+    copying the old ones back would bring files of 12-11 next to the database."""
     legacy = Path(legacy).expanduser()
     target = Path(target) if target is not None else data_home()
     copied = []
-    if not legacy.is_dir() or legacy.resolve() == target.resolve():
+    if not legacy.is_dir() or legacy.resolve() == target.resolve() or (target / 'coach.db').exists():
         return copied
     for source in legacy.rglob('*'):
         if source.is_file() and not source.name.endswith('.tmp'):

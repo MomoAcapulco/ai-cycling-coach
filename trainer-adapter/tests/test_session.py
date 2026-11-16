@@ -13,6 +13,7 @@ from coach.app.server import make_server
 from coach.app.settings import Settings
 from coach.session.recording import CsvReplay
 from coach.session.session import SessionError, SessionManager, list_sessions
+from coach.session.session_store import SessionStore
 
 
 class Clock:
@@ -35,7 +36,8 @@ class SessionManagerTests(unittest.TestCase):
         self.folder = Path(self.temp.name)
         self.clock = Clock()
         # a sampling period far longer than the test: samples happen only on pause/finish (deterministic)
-        self.session = SessionManager(reading, self.folder, ftp=lambda: 200, clock=self.clock, sample_seconds=60)
+        self.session = SessionManager(reading, self.folder, ftp=lambda: 200, clock=self.clock, sample_seconds=60,
+                                      db_path=self.folder / 'coach.db')
 
     def tearDown(self):
         self.temp.cleanup()
@@ -53,7 +55,7 @@ class SessionManagerTests(unittest.TestCase):
         self.assertAlmostEqual(summary['distanceKm'], 1.0)  # 30 km/h × 120 s
         self.assertEqual(summary['gearSeconds'], {'14': 120.0})
         self.assertEqual(summary['ftpWatts'], 200)
-        saved = json.loads((self.folder / f"{summary['session']}.json").read_text())
+        saved = SessionStore(self.folder / 'coach.db').get(summary['session'])
         self.assertEqual(saved['csv'], f"{summary['session']}.csv")
         with (self.folder / saved['csv']).open() as handle:
             rows = list(csv.DictReader(handle))
@@ -82,15 +84,15 @@ class SessionManagerTests(unittest.TestCase):
         self.session.start()
         self.clock.t = 30
         self.session.finish()
-        (self.folder / 'session_broken.json').write_text('{oops')
-        [entry] = list_sessions(self.folder)
+        (self.folder / 'session_broken.json').write_text('{oops')        # a stray file does not matter any more
+        [entry] = list_sessions(self.folder, self.folder / 'coach.db')
         self.assertEqual(entry['files'], [entry['csv'], f"{entry['session']}.json"])
 
 
 class SessionEndpointTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
-        self.runtime = AdapterRuntime(EnvConfig(record_dir=Path(self.temp.name)), Settings(mode='SIMULATOR'),
+        self.runtime = AdapterRuntime(EnvConfig(history_db=Path(self.temp.name) / 'coach.db', record_dir=Path(self.temp.name)), Settings(mode='SIMULATOR'),
                                       start_workers=False).start()
         self.httpd = make_server('127.0.0.1', 0, self.runtime)
         self.base = f'http://127.0.0.1:{self.httpd.server_address[1]}'
@@ -129,7 +131,7 @@ class SessionEndpointTests(unittest.TestCase):
     def test_changing_settings_finishes_the_session(self):
         self.call('POST', '/session/start')
         self.runtime.update({'hrEnabled': True})
-        [entry] = list_sessions(Path(self.temp.name))
+        [entry] = list_sessions(Path(self.temp.name), self.runtime.env.history_db)
         self.assertEqual(entry['finishReason'], 'settings changed')
 
     def test_no_sessions_in_replay(self):

@@ -41,7 +41,7 @@ class Settings:
     @classmethod
     def from_env(cls, env=None):
         env = os.environ if env is None else env
-        return cls(mode=(env.get('TRAINER_MODE') or 'SIMULATOR').strip().upper(),
+        return cls(mode=(env.get('TRAINER_MODE') or 'WAHOO').strip().upper(),   # the simulator is for development
                    replay_file=(env.get('REPLAY_FILE') or '').strip() or None,
                    hr_enabled=_flag(env.get('HR_ENABLED')),
                    zwift_enabled=_flag(env.get('ZWIFT_ENABLED')),

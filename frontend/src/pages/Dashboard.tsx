@@ -102,8 +102,9 @@ export function Dashboard({ data, error, history }: { data: Telemetry | null; er
       <StatusBar data={data} />
       {!replay && <SessionBar data={data} onError={setActionError} />}
       {idle && !data?.workoutType && sessionState === 'IDLE' && <FtpNotice />}
-      <Metrics data={data} power3s={power3s} idle={idle} />
+      {/* the player first, above the numbers, and it stays at the top while scrolling the charts */}
       {replay && <ReplayPlayer data={data} duration={duration} firstCommandAt={firstCommandAt} onError={setActionError} />}
+      <Metrics data={data} power3s={power3s} idle={idle} />
       {data?.workoutType === 'STRUCTURED' && <WorkoutPanel data={data} power3s={power3s} onError={setActionError} />}
       {replay && replayRoute && (
         <section className="panel dash-panel">

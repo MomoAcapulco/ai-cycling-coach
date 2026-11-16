@@ -231,13 +231,25 @@ class AdapterRuntime:
         return self._run_workout(StructuredWorkout(definition, ftp, source))
 
     def workout_summary(self) -> dict:
-        """For the session summary: the workout ridden in it (ended first if it was still running)."""
+        """For the session summary: the workout ridden in it (ended first if it was still running), and what the AI
+        needs to read the numbers: the grade difficulty of that day and the kind of sensors (never their names)."""
+        out = {}
         workout = self.state.workout if self.state is not None else None
-        if workout is None:
-            return {}
-        if workout.running:
-            workout.finish('session finished')
-        return {'workout': workout.summary()}
+        if workout is not None:
+            if workout.running:
+                workout.finish('session finished')
+            out['workout'] = workout.summary()
+        settings = self.settings
+        controlled = bool(settings and settings.mode == 'WAHOO' and settings.gear_control_enabled)
+        if self.profile_store is not None:
+            profile = self.profile_store.load()[0]
+            out.update(trainerDifficultyPercent=profile.grade_difficulty_percent,
+                       trainerDescentFactorPercent=profile.grade_descent_factor_percent)
+        out['trainerControlled'] = controlled          # the grade and gears really moved the trainer
+        if settings is not None:
+            out['sensorKinds'] = {'power': 'trainer' if settings.mode == 'WAHOO' else settings.mode.lower(),
+                                  'heartRate': 'bluetooth' if settings.hr_enabled else None}
+        return out
 
     def start_ramp_test(self, options: dict):
         """Start the ramp FTP test (and a session to record it, if none is running)."""
@@ -290,7 +302,8 @@ class AdapterRuntime:
             self._switch(settings, source, self._load_replay(settings))
 
     def _load_replay(self, settings):
-        return CsvReplay(settings.replay_path(self.env.record_dir)) if settings.mode == 'REPLAY' else None
+        return (CsvReplay(settings.replay_path(self.env.record_dir), db_path=self.env.history_db)
+                if settings.mode == 'REPLAY' else None)
 
     def _switch(self, settings, source, replay):
         if self.session is not None:
@@ -321,7 +334,7 @@ class AdapterRuntime:
             from coach.session.session import SessionManager
             self.session = SessionManager(lambda state=state: current_reading(state), self.env.record_dir,
                                           ftp=self._ftp, capture=self._capture, rider_kg=self._rider_kg,
-                                          extra=self.workout_summary)
+                                          extra=self.workout_summary, db_path=self.env.history_db)
             state.session_state = lambda session=self.session: session.state
         state.rider_ftp = self.workout_ftp
         self.state = state  # one reference swap: HTTP handlers see the old or the new state, never a mix

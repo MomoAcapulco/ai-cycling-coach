@@ -97,7 +97,7 @@ class ProfileUpdatesGradeTests(unittest.TestCase):
     def test_saving_the_profile_changes_the_running_controller(self):
         with tempfile.TemporaryDirectory() as folder:
             profile_store = ProfileStore(Path(folder) / 'profile.json')
-            runtime = AdapterRuntime(EnvConfig(record_dir=Path(folder)), Settings(mode='SIMULATOR'),
+            runtime = AdapterRuntime(EnvConfig(history_db=Path(folder) / 'coach.db', record_dir=Path(folder)), Settings(mode='SIMULATOR'),
                                      start_workers=False, profile_store=profile_store).start()
             runtime.state.grade = GradeController(GradePrefs(), ride=runtime.state.ride)  # as WAHOO + gear control
             server = Server(runtime)
@@ -120,7 +120,7 @@ class ProfileUpdatesGradeTests(unittest.TestCase):
             store.update({'gradeDifficultyPercent': 30})
             for settings, expected in ((Settings(mode='WAHOO', gear_control_enabled=True), True),
                                        (Settings(mode='WAHOO'), False), (Settings(mode='SIMULATOR'), False)):
-                runtime = AdapterRuntime(EnvConfig(record_dir=Path(folder)), settings, start_workers=False,
+                runtime = AdapterRuntime(EnvConfig(history_db=Path(folder) / 'coach.db', record_dir=Path(folder)), settings, start_workers=False,
                                          profile_store=store).start()
                 try:
                     with self.subTest(settings=settings):

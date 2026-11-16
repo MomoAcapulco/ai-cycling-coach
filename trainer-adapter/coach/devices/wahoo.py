@@ -131,7 +131,8 @@ async def bluetooth_worker(store, stop_event, device_id=None,
     while not stop_event.is_set():
         try:
             store.waiting('Buscando rodillo por Bluetooth...')
-            found = await find_for_role('trainer', registry=registry, explicit_id=device_id, scan_lock=scan_lock)
+            found = await find_for_role('trainer', registry=registry, explicit_id=device_id, scan_lock=scan_lock,
+                                        stop=stop_event)
             if found is None:
                 raise RuntimeError('No se encuentra el rodillo; cierra Zwift/Wahoo')
             if isinstance(found, Ambiguous):

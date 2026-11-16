@@ -94,6 +94,30 @@ def import_route_names(path: Path, db_path, backup: _Backup) -> str:
     return f'{result}; original in {backup.move(path)}'
 
 
+def import_session_files(folder: Path, db_path) -> int:
+    """Every ``session_<stamp>.json`` of the recordings ``folder`` into the database, then moved to the backup
+    folder next to it. Not only once: a summary is written there if the database failed when a session finished.
+    A session already in the database is not replaced (its feedback may be newer)."""
+    from coach.session.session_store import SessionStore
+    folder = Path(folder)
+    files = sorted(folder.glob('session_*.json')) if folder.is_dir() else []
+    if not files:
+        return 0
+    store, backup, imported = SessionStore(db_path), _Backup(folder.parent), 0
+    known = store.stems()
+    for path in files:
+        data, error = _read(path)
+        if error or not isinstance(data, dict) or not data.get('session'):
+            print(f'WARNING: {path.name} is not a session summary ({error or "no session"}): moved aside', flush=True)
+        elif data['session'] not in known:
+            store.save(data)
+            imported += 1
+        backup.move(path)
+    if imported:
+        print(f'Imported {imported} session summaries into {db_path}; originals in {backup.folder}', flush=True)
+    return imported
+
+
 def import_all(home: Path, db_path) -> dict:
     """Import what has not been imported yet. Returns {name: what happened} for the files handled now."""
     from coach.app.paths import data_file, routes_dir
@@ -108,6 +132,10 @@ def import_all(home: Path, db_path) -> dict:
             continue
         done[name] = step(Path(path), db_path, backup)
         _note(db_path, name, done[name])
+    from coach.app.paths import recordings_dir
+    sessions = import_session_files(recordings_dir(), db_path)
+    if sessions:
+        done['sessions'] = f'imported {sessions}'
     if any('imported' in text for text in done.values()):
         print(f'Imported into {db_path}: ' + '; '.join(f'{k} {v}' for k, v in done.items()), flush=True)
     return done

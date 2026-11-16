@@ -9,6 +9,7 @@ from urllib.request import Request, urlopen
 
 from coach.session.session import save_feedback
 from tests.test_fit_export import row as csv_row, write_session
+from coach.session.session_store import SessionStore
 
 
 class FeedbackTests(unittest.TestCase):
@@ -16,18 +17,18 @@ class FeedbackTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             folder = Path(folder)
             write_session(folder, [csv_row(t) for t in range(60)])
-            saved = save_feedback(folder, 'session_20261113_130000', {'rpe': 7, 'note': '  piernas cargadas '})
+            saved = save_feedback(folder, 'session_20261113_130000', {'rpe': 7, 'note': '  piernas cargadas '}, folder / 'coach.db')
             self.assertEqual((saved['rpe'], saved['note']), (7, 'piernas cargadas'))
-            summary = json.loads((folder / 'session_20261113_130000.json').read_text())
+            summary = SessionStore(folder / 'coach.db').get('session_20261113_130000')
             self.assertEqual(summary['feedback']['rpe'], 7)
             self.assertEqual(summary['avgPowerW'], 200.0)                               # the rest is kept
-            self.assertIsNone(save_feedback(folder, 'session_20261113_130000', {'rpe': None})['rpe'])
+            self.assertIsNone(save_feedback(folder, 'session_20261113_130000', {'rpe': None}, folder / 'coach.db')['rpe'])
             for bad in ({'rpe': 11}, {'rpe': 0}, {'rpe': 6.5}, {'rpe': True}, {'note': 'x' * 501}):
                 with self.subTest(bad=bad), self.assertRaises(ValueError):
-                    save_feedback(folder, 'session_20261113_130000', bad)
+                    save_feedback(folder, 'session_20261113_130000', bad, folder / 'coach.db')
             for stem in ('session_20261113_130001', '../x', 'session_1'):
                 with self.subTest(stem=stem), self.assertRaises(FileNotFoundError):
-                    save_feedback(folder, stem, {'rpe': 5})
+                    save_feedback(folder, stem, {'rpe': 5}, folder / 'coach.db')
 
 
 class ApiTests(unittest.TestCase):
@@ -64,7 +65,7 @@ class ApiTests(unittest.TestCase):
         session.start()
         session._sample_unlocked()                                     # one sample on the route
         stem = session.finish()['session']
-        saved = json.loads((self.folder / f'{stem}.json').read_text())
+        saved = SessionStore(self.runtime.env.history_db).get(stem)
         self.assertEqual(saved['routes'][0]['file'], route['file'])
         self.assertEqual(self.call(f'/sessions/{stem}/feedback', {'rpe': 8, 'note': 'dura'})['rpe'], 8)
         [listed] = self.call('/routes')['routes']
@@ -73,12 +74,13 @@ class ApiTests(unittest.TestCase):
         self.assertIn('duró solo', listed['lastRide']['why'])
         self.assertIsNone(listed['replayRide'])
         from coach.session.recording import CsvReplay
-        replay = CsvReplay(self.folder / f'{stem}.csv')
+        replay = CsvReplay(self.folder / f'{stem}.csv', db_path=self.runtime.env.history_db)
         self.assertEqual(replay.series()['routes'][0]['file'], route['file'])  # the replay can draw the route
         self.assertEqual(replay.snapshot()['routeName'], route['name'])
-        summary = json.loads((self.folder / f'{stem}.json').read_text())        # as if it had lasted 10 min, 5 km
+        store = SessionStore(self.runtime.env.history_db)                      # as if it had lasted 10 min, 5 km
+        summary = store.get(stem)
         summary['elapsedSeconds'], summary['routes'][0]['km'] = 600, 5.0
-        (self.folder / f'{stem}.json').write_text(json.dumps(summary))
+        store.save(summary)
         [listed] = self.call('/routes')['routes']
         self.assertEqual((listed['replayRide']['session'], listed['replayRide']['csv']), (stem, f'{stem}.csv'))
         [activity] = self.call('/history')['activities']

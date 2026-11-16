@@ -243,10 +243,11 @@ class Handler(BaseHTTPRequestHandler):
         if path == '/routes' and self.admin is not None:
             from coach.app.routes_store import list_routes
             from coach.session.session import list_sessions
+            self.sessions_ready()
             ride = state.ride
             routes = list_routes(self.admin.env.routes_dir, db_path=self.admin.env.history_db)
             rides = {}                                    # route file -> its sessions, newest first
-            for session in list_sessions(self.admin.env.record_dir):
+            for session in list_sessions(self.admin.env.record_dir, self.admin.env.history_db):
                 for ridden in session.get('routes') or []:
                     seconds, km = session.get('elapsedSeconds') or 0, ridden.get('km') or 0
                     why = ('falta el CSV de la sesión' if session.get('csv') not in session.get('files', [])
@@ -261,7 +262,13 @@ class Handler(BaseHTTPRequestHandler):
                 route['rides'] = len(ridden)
                 route['lastRide'] = ridden[0] if ridden else None
                 route['replayRide'] = next((r for r in ridden if r['replayable']), None)   # the newest that can be replayed
-            self.respond({'routes': routes, 'folder': str(self.admin.env.routes_dir),
+            limit, offset = self.page()
+            total = len(routes)
+            # the races for «like my race» in the generator: all of them, whatever page is shown
+            races = [{k: r.get(k) for k in ('file', 'name', 'distanceKm', 'elevationGainM', 'maxGradePercent')}
+                     for r in routes if r.get('valid') and not r.get('generated')]
+            routes = routes[offset:] if limit is None else routes[offset:offset + limit]
+            self.respond({'routes': routes, 'races': races, 'total': total, 'limit': limit, 'offset': offset,
                           'current': ride.route.file if ride is not None and ride.route is not None else None,
                           'available': self.route_unavailable() is None})
             return
@@ -299,8 +306,13 @@ class Handler(BaseHTTPRequestHandler):
             self.respond(self.ftp_json())
             return
         if path == '/sessions' and self.admin is not None:
-            from coach.session.session import list_sessions
-            self.respond({'sessions': list_sessions(self.admin.env.record_dir)})
+            from coach.session.session import count_tests, sessions_page
+            self.sessions_ready()
+            limit, offset = self.page()
+            hide = (parse_qs(urlsplit(self.path).query).get('tests') or [''])[0] == 'hide'
+            sessions, total = sessions_page(self.admin.env.record_dir, self.admin.env.history_db, limit, offset, hide)
+            self.respond({'sessions': sessions, 'total': total, 'limit': limit, 'offset': offset,
+                          'tests': count_tests(self.admin.env.history_db)})
             return
         if path.startswith('/sessions/') and self.admin is not None:
             self.send_session_file(path[len('/sessions/'):])
@@ -327,6 +339,8 @@ class Handler(BaseHTTPRequestHandler):
             if state.mode != 'REPLAY':
                 self.send_error(409, 'Only available in REPLAY mode')
                 return
+            if path == '/replay/session' and self.admin is not None:
+                self.sessions_ready()                 # the routes of the session come from its summary
             self.respond(state.replay.series() if path == '/replay/session' else state.replay.state())
             return
         reading = current_reading(state)
@@ -338,11 +352,30 @@ class Handler(BaseHTTPRequestHandler):
         self.respond(data)
 
     def history_store(self):
-        from coach.history.store import HistoryStore, import_app_sessions
+        from coach.history.store import HistoryStore
         env = self.admin.env
-        store = HistoryStore(env.history_db) if env.history_db else HistoryStore.default()
-        import_app_sessions(store, env.record_dir)
-        return store
+        self.sessions_ready()
+        return HistoryStore(env.history_db) if env.history_db else HistoryStore.default()
+
+    def sessions_ready(self):
+        """Session summaries left as JSON next to the CSVs (earlier versions, or a database failure when a session
+        finished) go into the database before anything reads the sessions (coach/app/legacy_json.py)."""
+        from coach.app import db
+        from coach.app.legacy_json import import_session_files
+        env = self.admin.env
+        if any(env.record_dir.glob('session_*.json')):
+            import_session_files(env.record_dir, db.migrate(env.history_db) if env.history_db else db.open_default())
+
+    def page(self, default_limit=20, max_limit=200):
+        """``?limit=&offset=`` of a list: (limit, offset); ``limit=all`` gives everything (limit None)."""
+        query = parse_qs(urlsplit(self.path).query)
+        raw = (query.get('limit') or [str(default_limit)])[0]
+        try:
+            limit = None if raw == 'all' else max(1, min(max_limit, int(raw)))
+            offset = max(0, int((query.get('offset') or ['0'])[0]))
+        except ValueError:
+            limit, offset = default_limit, 0
+        return limit, offset
 
     def load_json(self):
         """Training load per activity and fitness / fatigue / form (coach/history/load.py)."""
@@ -366,10 +399,16 @@ class Handler(BaseHTTPRequestHandler):
 
     def history_json(self, weeks: bool):
         """Every activity (this app's sessions are added on the fly), or totals per week (Monday to Sunday)."""
+        from coach.history.store import TYPES
         store = self.history_store()
-        rows = store.list(5000)
+        kind = (parse_qs(urlsplit(self.path).query).get('type') or [None])[0]
+        kind = kind if kind in TYPES else None                    # ?type=run: the list AND the weekly totals
         if not weeks:
-            return {'activities': rows[:500], 'counts': store.count_by(), 'database': str(store.path)}
+            limit, offset = self.page(default_limit=25)
+            return {'activities': store.list(limit, offset=offset, kind=kind), 'total': store.total(kind=kind),
+                    'limit': limit, 'offset': offset, 'type': kind, 'counts': store.count_by(),
+                    'types': store.count_by_type()}
+        rows = store.list(None, kind=kind)
         from datetime import datetime, timedelta
         totals = {}
         for row in rows:
@@ -423,16 +462,26 @@ class Handler(BaseHTTPRequestHandler):
     def send_session_file(self, name):
         """Download of a finished session's file: only session_* names inside the recordings folder."""
         import re
+        self.sessions_ready()
         if re.fullmatch(r'session_\d{8}_\d{6}\.fit', name):
             # the FIT activity is built on request from the session's CSV and summary (coach/session/fit_export.py)
             from coach.session.fit_export import session_fit
             try:
-                body = session_fit(self.admin.env.record_dir, name[:-len('.fit')])
+                body = session_fit(self.admin.env.record_dir, name[:-len('.fit')], self.admin.env.history_db)
             except (OSError, ValueError, KeyError) as exc:
                 self.send_error(404, f'No FIT for this session: {exc}')
                 return
             kind = 'application/vnd.ant.fit'
-        elif not re.fullmatch(r'session_\d{8}_\d{6}(_ble_raw\.jsonl|\.csv|\.json)', name):
+        elif re.fullmatch(r'session_\d{8}_\d{6}\.json', name):
+            # the summary is in the database (coach/session/session_store.py): downloaded as it was saved
+            from coach.session.session_store import SessionStore
+            summary = SessionStore(self.admin.env.history_db).get(name[:-len('.json')])
+            if summary is None:
+                self.send_error(404)
+                return
+            body = dumps(summary, indent=2, ensure_ascii=False).encode('utf-8')
+            kind = 'application/json'
+        elif not re.fullmatch(r'session_\d{8}_\d{6}(_ble_raw\.jsonl|\.csv)', name):
             self.send_error(404)
             return
         else:
@@ -490,14 +539,14 @@ class Handler(BaseHTTPRequestHandler):
             feedback = re.fullmatch(r'/sessions/(session_\d{8}_\d{6})/feedback', path)
             if feedback and self.admin is not None:
                 from coach.session.session import save_feedback
+                self.sessions_ready()
                 try:
-                    saved = save_feedback(self.admin.env.record_dir, feedback.group(1), self.read_json())
+                    saved = save_feedback(self.admin.env.record_dir, feedback.group(1), self.read_json(),
+                                          self.admin.env.history_db)
                 except FileNotFoundError:
                     self.send_error(404, 'No such session')
                     return
-                store = self.history_store()          # the history (and later the AI) sees it too
-                store.update(f'app:{feedback.group(1)}', {'rpe': saved['rpe'], 'feeling': saved['note']})
-                self.respond(saved)
+                self.respond(saved)                   # its activity (history, AI) is updated with it
                 return
             replay = re.fullmatch(r'/routes/([^/]+\.gpx)/replay', path)
             if replay and self.admin is not None:
@@ -685,9 +734,8 @@ def _delete_file(self, path):
         if state.mode == 'REPLAY' and state.replay is not None and state.replay.filename.stem == stem:
             self.send_error(409, 'This session is open in the replay: leave the replay first')
             return
-        result = delete_session(env.record_dir, stem)
-        self.history_store().delete(f'app:{stem}')          # it no longer counts in the history and the load
-        self.respond(result)
+        self.sessions_ready()
+        self.respond(delete_session(env.record_dir, stem, env.history_db))   # no longer counts in history or load
     except FileNotFoundError:
         self.send_error(404, 'Not found')
 
@@ -711,7 +759,7 @@ def server_config():
 
 
 def trainer_mode():
-    mode = os.environ.get('TRAINER_MODE', 'SIMULATOR').upper()
+    mode = os.environ.get('TRAINER_MODE', 'WAHOO').upper()
     if mode not in MODES:
         raise ValueError('TRAINER_MODE must be SIMULATOR, WAHOO or REPLAY')
     return mode

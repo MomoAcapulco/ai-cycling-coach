@@ -72,17 +72,37 @@ class HistoryStore:
                                 f"({', '.join('?' for _ in names)})", [row[n] for n in names])
             return cursor.rowcount == 1
 
-    def list(self, limit: int = 500, since: Optional[str] = None):
+    def list(self, limit: Optional[int] = 500, since: Optional[str] = None, offset: int = 0, kind: Optional[str] = None):
+        """Activities newest first, without the deleted ones (a session moved to the trash no longer counts);
+        ``kind`` keeps one type (ride, run…)."""
         with self.lock, self._db() as db:
             db.row_factory = sqlite3.Row
-            query = 'SELECT * FROM activities'
-            args = []
+            query, args = 'SELECT * FROM activities WHERE deleted_utc IS NULL', []
             if since:
-                query += ' WHERE start_utc >= ?'
+                query += ' AND start_utc >= ?'
                 args.append(since)
-            query += ' ORDER BY start_utc DESC LIMIT ?'
-            args.append(limit)
+            if kind:
+                query += ' AND type = ?'
+                args.append(kind)
+            query += ' ORDER BY start_utc DESC, id DESC LIMIT ? OFFSET ?'
+            args += [-1 if limit is None else limit, offset]
             return [dict(r) for r in db.execute(query, args)]
+
+    def total(self, since: Optional[str] = None, kind: Optional[str] = None) -> int:
+        query, args = 'SELECT COUNT(*) FROM activities WHERE deleted_utc IS NULL', []
+        if since:
+            query += ' AND start_utc >= ?'
+            args.append(since)
+        if kind:
+            query += ' AND type = ?'
+            args.append(kind)
+        with self.lock, self._db() as db:
+            return db.execute(query, args).fetchone()[0]
+
+    def count_by_type(self):
+        with self.lock, self._db() as db:
+            return dict(db.execute('SELECT type, COUNT(*) FROM activities WHERE deleted_utc IS NULL '
+                                   'GROUP BY type').fetchall())
 
     def update(self, activity_id: str, values: dict):
         names = [n for n in values if n in {c for c, _ in COLUMNS} and n != 'id']
@@ -98,7 +118,8 @@ class HistoryStore:
 
     def count_by(self):
         with self.lock, self._db() as db:
-            return dict(db.execute('SELECT source, COUNT(*) FROM activities GROUP BY source').fetchall())
+            return dict(db.execute('SELECT source, COUNT(*) FROM activities WHERE deleted_utc IS NULL '
+                                   'GROUP BY source').fetchall())
 
     def copy_file(self, name: str, data: bytes) -> str:
         """Keep the original file (gzip or not) and return its path relative to the data home."""

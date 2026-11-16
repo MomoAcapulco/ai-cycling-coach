@@ -42,7 +42,8 @@ async def hr_worker(store, stop_event, device_id=None, capture=None, scan_lock=N
     while not stop_event.is_set():
         try:
             store.waiting('Buscando pulsómetro BLE...')
-            found = await find_for_role('heart_rate', registry=registry, explicit_id=device_id, scan_lock=scan_lock)
+            found = await find_for_role('heart_rate', registry=registry, explicit_id=device_id, scan_lock=scan_lock,
+                                        stop=stop_event)
             if found is None:
                 # Straps only advertise with skin contact, and stop while another device (watch, phone, Zwift)
                 # is connected to them: say what to check instead of just "waiting".

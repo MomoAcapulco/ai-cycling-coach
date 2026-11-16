@@ -74,7 +74,7 @@ export type Route = 'panel' | 'entrenamientos' | 'rutas' | 'sesiones' | 'histori
 /** Minimal hash router: #/rutas, #/sesiones, #/ajustes, anything else is the panel. */
 export function useRoute(): Route {
   const read = (): Route => {
-    const page = window.location.hash.replace(/^#\/?/, '');
+    const page = window.location.hash.replace(/^#\/?/, '').split('/')[0];   // #/ajustes/perfil → ajustes
     return page === 'ajustes' || page === 'sesiones' || page === 'rutas' || page === 'historial' || page === 'entrenamientos' ? page : 'panel';
   };
   const [route, setRoute] = useState<Route>(read);

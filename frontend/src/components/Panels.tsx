@@ -34,7 +34,7 @@ const battery = (pct: number | null | undefined) => (pct == null ? '' : ` · ${p
 
 /** Several unknown devices nearby: the adapter waits for the rider's choice in Ajustes (never guesses). */
 const mustChoose = (text?: string | null) => !!text && (text.includes('elige uno en Ajustes') || text === 'CHOOSE_IN_SETTINGS');
-const CHOOSE = <a href="#/ajustes">elige cuál en Ajustes</a>;
+const CHOOSE = <a href="#/ajustes/rodillo">elige cuál en Ajustes</a>;
 
 /** Why a device is not streaming, in a few words: the adapter's message without the technical prefix. */
 const reason = (text?: string | null) =>
@@ -135,11 +135,23 @@ export function ReplayPlayer({ data, duration, firstCommandAt, onError }: {
     if (dragging != null) void run('seek', dragging);
     setDragging(null);
   };
+  const playing = !!data?.replayPlaying;
+  const [leaving, setLeaving] = useState(false);
   return (
-    <section className="panel replay-panel">
-      <div className="panel-heading">
-        <h2>Reproductor de sesión</h2>
-        <span>{data?.replayPlaying ? 'REPRODUCIENDO' : 'PAUSADO / FINALIZADO'} · {clock(dragging ?? position)} / {clock(duration)}</span>
+    <section className="panel replay-panel" aria-label="Reproductor del replay">
+      <div className="replay-main">
+        <button className="replay-play" disabled={busy} aria-label={playing ? 'Pausar' : 'Reproducir'}
+          onClick={() => void run(playing ? 'pause' : 'play')}>{playing ? '❚❚' : '▶'}</button>
+        <div className="replay-time">
+          <small>{playing ? 'REPRODUCIENDO' : position >= duration && duration > 0 ? 'TERMINADO' : 'EN PAUSA'} · REPLAY</small>
+          <strong>{clock(dragging ?? position)}<em> / {clock(duration)}</em></strong>
+        </div>
+        <div className="replay-speeds" role="group" aria-label="Velocidad">
+          {[0.5, 1, 2, 4, 8, 16].map((v) => (
+            <button key={v} disabled={busy} className={(data?.replaySpeed ?? 1) === v ? 'selected' : ''}
+              onClick={() => void run('speed', v)}>{String(v).replace('.', ',')}×</button>
+          ))}
+        </div>
       </div>
       <input className="timeline" aria-label="Posición de la reproducción" type="range" min={0} max={duration} step={1}
         value={dragging ?? position}
@@ -147,23 +159,19 @@ export function ReplayPlayer({ data, duration, firstCommandAt, onError }: {
         onPointerUp={commit} onKeyUp={commit} onBlur={() => dragging != null && commit()} />
       <div className="replay-actions">
         <div>
-          <button disabled={busy} onClick={() => void run(data?.replayPlaying ? 'pause' : 'play')}>
-            {data?.replayPlaying ? '⏸ Pausar' : '▶ Reproducir'}
-          </button>
-          <button disabled={busy} onClick={() => void run('restart')}>↺ Reiniciar</button>
-          <button disabled={busy} title="Para entrenar, hacer el test de FTP o rodar una ruta"
-            onClick={() => { setBusy(true); exitReplay().then(() => onError('')).catch((e) => onError(`Salir del replay: ${e instanceof Error ? e.message : e}`)).finally(() => setBusy(false)); }}>
-            ⏏ Salir del replay (volver a {LIVE_LABEL[lastLiveMode()]})</button>
+          <button disabled={busy} onClick={() => void run('restart')}>↺ Al principio</button>
           {firstCommandAt != null && (
             <button disabled={busy} onClick={() => void run('seek', firstCommandAt)}>Ir a la primera orden ({clock(firstCommandAt)})</button>
           )}
         </div>
-        <label>Velocidad
-          <select disabled={busy} value={data?.replaySpeed ?? 1} onChange={(e) => void run('speed', Number(e.target.value))}>
-            <option value={0.5}>0,5×</option><option value={1}>1×</option><option value={2}>2×</option><option value={4}>4×</option>
-            <option value={8}>8×</option><option value={16}>16×</option>
-          </select>
-        </label>
+        <button className="replay-exit" disabled={busy} title="Para entrenar, hacer el test de FTP o rodar una ruta"
+          onClick={() => {
+            setBusy(true); setLeaving(true);
+            exitReplay().then(() => onError(''))
+              .catch((e) => { setLeaving(false); onError(`Salir del replay: ${e instanceof Error ? e.message : e}`); })
+              .finally(() => setBusy(false));
+          }}>
+          {leaving ? `Saliendo… (buscando el ${LIVE_LABEL[lastLiveMode()]})` : `⏏ Salir del replay (volver a ${LIVE_LABEL[lastLiveMode()]})`}</button>
       </div>
     </section>
   );

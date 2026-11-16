@@ -14,6 +14,10 @@ bash init.sh --start
 
 `init.sh` comprueba Python, Node, Java y Maven, prepara dependencias, compila y arranca. Las siguientes veces basta con `./start.sh`.
 
+`./start.sh` compila la interfaz y el API Java solo cuando han cambiado, y los sirve optimizados: cada página abre
+rápido también la primera vez. Para desarrollar, `./start.sh --dev` (Vite compila cada página al abrirla y los cambios
+se ven sin reiniciar).
+
 Abre `http://127.0.0.1:5173`. En el **Panel** inicias, pausas y terminas las sesiones; en **Sesiones** las ves, descargas y reproduces. En **Ajustes** eliges la fuente de datos (rodillo real, replay o simulador), subes grabaciones, activas pulsómetro y mandos, y rellenas tu perfil.
 
 La aplicación lleva una **carretera virtual**: la velocidad se calcula con física a partir de tus vatios y tu peso (la del rodillo no baja al subir), y con ella la distancia, la altitud y el desnivel acumulado. La pendiente la eliges tú y cambia según avanzas, como en una carretera. Puedes probarla sin rodillo en el simulador: `docs/pruebas/PRUEBA-pendiente-en-el-simulador.md`.

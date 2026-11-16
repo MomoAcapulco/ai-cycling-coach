@@ -26,7 +26,7 @@ class SettingsTests(unittest.TestCase):
         s = Settings.from_env({'TRAINER_MODE': 'replay', 'REPLAY_FILE': ' a.csv ', 'HR_ENABLED': 'true',
                                'ZWIFT_ENABLED': 'yes', 'RECORD_ENABLED': 'false', 'RECORD_SECONDS': '900'})
         self.assertEqual(s, Settings('REPLAY', 'a.csv', True, True, False, 900))
-        self.assertEqual(Settings.from_env({}), Settings(record_enabled=True))
+        self.assertEqual(Settings.from_env({}), Settings(mode='WAHOO', record_enabled=True))   # the trainer; the simulator is for development
 
     def test_updated_is_strict(self):
         base = Settings()
@@ -128,7 +128,7 @@ class AdminServerTests(unittest.TestCase):
         (self.recordings / 'ride.csv').write_text(CSV)
         self.registry = DeviceRegistry(root / 'devices.json')
         self.store = SettingsStore(root / 'coach.db')
-        self.runtime = AdapterRuntime(EnvConfig(record_dir=self.recordings), Settings(mode='SIMULATOR'),
+        self.runtime = AdapterRuntime(EnvConfig(history_db=Path(self.recordings) / 'coach.db', record_dir=self.recordings), Settings(mode='SIMULATOR'),
                                       store=self.store, registry=self.registry, start_workers=False).start()
         self.httpd = make_server('127.0.0.1', 0, self.runtime)
         self.base = f'http://127.0.0.1:{self.httpd.server_address[1]}'
@@ -161,7 +161,7 @@ class AdminServerTests(unittest.TestCase):
 
     def test_saved_settings_survive_a_restart(self):
         self.call('POST', '/admin/settings', {'mode': 'REPLAY', 'replayFile': str(self.recordings / 'ride.csv')})
-        again = AdapterRuntime(EnvConfig(record_dir=self.recordings), Settings(mode='SIMULATOR'),
+        again = AdapterRuntime(EnvConfig(history_db=Path(self.recordings) / 'coach.db', record_dir=self.recordings), Settings(mode='SIMULATOR'),
                                store=self.store, start_workers=False).start()
         self.assertEqual((again.settings.mode, again.source), ('REPLAY', 'saved'))
 
@@ -213,7 +213,7 @@ class AdminServerTests(unittest.TestCase):
 class ControlTestPinsSettings(unittest.TestCase):
     def test_admin_cannot_leave_the_control_test_configuration(self):
         with tempfile.TemporaryDirectory() as folder:
-            runtime = AdapterRuntime(EnvConfig(control_test=True, record_dir=Path(folder)),
+            runtime = AdapterRuntime(EnvConfig(history_db=Path(folder) / 'coach.db', control_test=True, record_dir=Path(folder)),
                                      Settings(mode='WAHOO', record_enabled=True, record_seconds=600),
                                      start_workers=False).start()
             with self.assertRaises(PermissionError):
@@ -252,3 +252,7 @@ class DataHomeTests(unittest.TestCase):
             self.assertEqual((target / 'profile.json').read_text(), 'new profile')   # never overwritten
             self.assertTrue((legacy / 'profile.json').exists())                       # never deleted
             self.assertEqual(migrate_legacy_home(legacy, target), [])                 # idempotent
+            (target / 'profile.json').unlink()                                       # moved into coach.db…
+            (target / 'coach.db').write_bytes(b'')
+            self.assertEqual(migrate_legacy_home(legacy, target), [])                 # …so the old one stays away
+            self.assertFalse((target / 'profile.json').exists())

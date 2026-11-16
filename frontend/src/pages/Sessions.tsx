@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { api, sessionFileUrl } from '../api';
+import { api, type Page, sessionFileUrl } from '../api';
 import { clock, fmt } from '../format';
 import type { LoadReport, SessionSummary, SessionWorkout } from '../types';
 import { EffortPicker } from '../components/EffortPicker';
 import { toast } from '../toast';
+import { Pager } from '../components/Pager';
 
 const EFFORTS: [string, string][] = [['5', '5 s'], ['60', '1 min'], ['300', '5 min'], ['1200', '20 min']];
 
@@ -58,16 +59,15 @@ export function Sessions() {
   const [load, setLoad] = useState<LoadReport | null>(null);
   const [showTests, setShowTests] = useState(false);
 
-  useEffect(() => {
-    api.sessions()
-      .then((r) => setSessions(r.sessions))
-      .catch((e) => setError(`No se pudieron leer las sesiones: ${e instanceof Error ? e.message : e}`));
-    api.historyLoad(7).then(setLoad).catch(() => undefined);   // same FTP and load as the History page
-  }, []);
-  // Sessions of a few seconds or without any work are tests: hidden unless asked for
-  const isTest = (s: SessionSummary) => s.elapsedSeconds < 60 || (!s.workKj && (s.distanceKm ?? 0) < 0.05);
-  const tests = (sessions ?? []).filter(isTest).length;
-  const shown = (sessions ?? []).filter((s) => showTests || !isTest(s));
+  const [page, setPage] = useState<Page | null>(null);
+  const [tests, setTests] = useState(0);
+  // A page at a time, newest first; sessions of a few seconds or without any work are tests: hidden unless asked for
+  const loadPage = (offset: number) => api.sessions(offset, !showTests)
+    .then((r) => { setSessions(r.sessions); setPage(r); setTests(r.tests); setError(''); })
+    .catch((e) => setError(`No se pudieron leer las sesiones: ${e instanceof Error ? e.message : e}`));
+  useEffect(() => { void loadPage(0); }, [showTests]);
+  useEffect(() => { api.historyLoad(7).then(setLoad).catch(() => undefined); }, []);   // same FTP and load as History
+  const shown = sessions ?? [];
   const ftp = load?.params.ftp ?? null;
   const ftpNote = load?.params.ftp_source === 'history' ? ' (FTP estimado)' : '';
   const loadOf = (s: SessionSummary) => load?.activities.find((a) => a.id === `app:${s.session}`);
@@ -76,7 +76,7 @@ export function Sessions() {
     if (!window.confirm(`¿Borrar la sesión del ${date(s.startedAtUtc)}? Se mueve a la papelera de la carpeta de grabaciones (.papelera) `
       + 'y deja de contar en el historial; se puede recuperar a mano.')) return;
     setBusy(true);
-    try { await api.deleteSession(s.session); setSessions((all) => (all ?? []).filter((x) => x.session !== s.session)); }
+    try { await api.deleteSession(s.session); toast.ok('Sesión movida a la papelera.'); await loadPage(page?.offset ?? 0); }
     catch (e) { toast.error(`No se pudo borrar: ${e instanceof Error ? e.message : e}`); }
     finally { setBusy(false); }
   };
@@ -102,7 +102,7 @@ export function Sessions() {
         </div>
       </div>
       {error && <div className="alert">{error}</div>}
-      {sessions && sessions.length === 0 && <p className="muted">Todavía no hay sesiones. Inicia una desde el Panel.</p>}
+      {sessions && sessions.length === 0 && !tests && <p className="muted">Todavía no hay sesiones. Inicia una desde el Panel.</p>}
       {tests > 0 && (
         <div className="admin-actions">
           <button onClick={() => setShowTests(!showTests)}>{showTests ? 'Ocultar' : 'Mostrar'} {tests} {tests === 1 ? 'sesión de prueba' : 'sesiones de prueba'} (menos de 1 minuto o sin trabajo)</button>
@@ -157,6 +157,7 @@ export function Sessions() {
           </div>
         </article>
       ))}
+      <Pager page={page} label="sesiones" onPage={(offset) => { void loadPage(offset); window.scrollTo({ top: 0 }); }} />
     </div>
   );
 }

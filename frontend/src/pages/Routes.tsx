@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { api } from '../api';
+import { api, type RoutesPage } from '../api';
+import { Pager } from '../components/Pager';
 import { fmt } from '../format';
 import { RouteProfile } from '../components/Charts';
 import type { ActiveRoute, RouteSummary, Telemetry } from '../types';
@@ -8,7 +9,7 @@ import { RouteGenerator } from '../components/RouteGenerator';
 import { RPE_LABELS, rpeColor } from '../components/EffortPicker';
 import { toast } from '../toast';
 
-type Listing = { routes: RouteSummary[]; folder: string; current: string | null; available: boolean };
+type Listing = RoutesPage;
 
 /**
  * GPX routes: upload, list with their profile, and choose one to ride. Choosing a route IS choosing the grade:
@@ -23,11 +24,14 @@ export function Routes({ data }: { data: Telemetry | null }) {
   const fail = (_file: string, text: string) => toast.error(text);
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<{ file: string; name: string } | null>(null);
+  /** The list is compact (name and numbers); a route opens to show its profile and buttons. null: the one being
+   * ridden is open; '' : none. */
+  const [open, setOpen] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
-  const load = async () => {
-    try { setListing(await api.routes()); setError(''); }
+  const load = async (offset = listing?.offset ?? 0) => {
+    try { setListing(await api.routes(offset)); setError(''); }
     catch (e) { setError(`No se pudieron leer las rutas: ${message(e)}`); }
   };
   useEffect(() => { void load(); }, []);
@@ -40,8 +44,9 @@ export function Routes({ data }: { data: Telemetry | null }) {
     setBusy(true);
     try {
       const saved = await api.uploadRoute(file);
+      setOpen(saved.file);
       toast.ok(`Ruta «${saved.name}» guardada: ${fmt(saved.distanceKm, 1)} km y ${fmt(saved.elevationGainM, 0)} m de desnivel.`);
-      await load();
+      await load(0);                                   // the newest: first page
     } catch (e) {
       toast.error(`No se pudo subir «${file.name}»: ${message(e)}`);
     } finally {
@@ -112,7 +117,7 @@ export function Routes({ data }: { data: Telemetry | null }) {
       </div>
       {error && <div className="alert">{error}</div>}
       {listing && !listing.available && (
-        <div className="notice">Para rodar una ruta usa el modo Simulador o el rodillo real con el control de marchas activado (Ajustes).</div>
+        <div className="notice">Para rodar una ruta, activa el control de marchas del rodillo en Ajustes.</div>
       )}
       <div className="admin-actions">
         <input ref={fileInput} type="file" accept=".gpx,application/gpx+xml" hidden
@@ -120,13 +125,27 @@ export function Routes({ data }: { data: Telemetry | null }) {
         <button className="primary" disabled={busy} onClick={() => fileInput.current?.click()}>Subir GPX</button>
         {current && <button disabled={busy} onClick={() => void leave()}>Salir de la ruta actual</button>}
       </div>
-      {listing && <RouteGenerator races={listing.routes.filter((r) => r.valid && !r.generated)}
-        onSaved={() => { toast.ok('Ruta generada guardada: está la primera de la lista.'); void load(); }} />}
+      {listing && <RouteGenerator races={listing.races as RouteSummary[]}
+        onSaved={() => { toast.ok('Ruta generada guardada: está la primera de la lista.'); void load(0); }} />}
       {listing && listing.routes.length === 0 && <p className="muted">Todavía no hay rutas. Sube un GPX (con altitud).</p>}
+      {listing && listing.routes.length > 0 && <h2 className="subheading">Tus rutas</h2>}
       {listing?.routes.map((r) => {
         const active = profiles[r.file];
+        const isOpen = open === r.file || (open === null && r.file === current);
+        if (!isOpen) {
+          return (
+            <button key={r.file} className="route-row" onClick={() => setOpen(r.file)} aria-expanded="false">
+              <strong>{r.name}</strong>
+              {r.valid
+                ? <span>{fmt(r.distanceKm, 1)} km · {fmt(r.elevationGainM, 0)} m+ · máx. {fmt(r.maxGradePercent, 1)} %{r.rides ? ` · rodada ${r.rides === 1 ? '1 vez' : `${r.rides} veces`}` : ''}</span>
+                : <span className="warn">no se puede usar</span>}
+              <em className={r.file === current ? 'live-tag' : ''}>{r.file === current ? 'RODANDO' : r.generated ? 'GENERADA' : r.recorded ? 'GRABADA' : ''}</em>
+            </button>
+          );
+        }
         return (
           <article className="panel session-card" key={r.file}>
+            <button className="link-button route-close" onClick={() => setOpen('')} aria-expanded="true">▴ cerrar</button>
             <div className="panel-heading">
               {editing?.file === r.file ? (
                 <div className="rename">
@@ -178,6 +197,7 @@ export function Routes({ data }: { data: Telemetry | null }) {
           </article>
         );
       })}
+      <Pager page={listing} label="rutas" onPage={(offset) => { void load(offset); setOpen(null); window.scrollTo({ top: 0 }); }} />
     </div>
   );
 }

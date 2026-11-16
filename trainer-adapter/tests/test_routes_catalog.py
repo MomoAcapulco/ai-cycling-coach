@@ -61,6 +61,23 @@ class RouteCatalogueTests(unittest.TestCase):
         list_routes(self.routes, self.db)
         self.assertEqual([r['file'] for r in self.rows()], ['a_mano.gpx'])
 
+    def test_listing_again_reads_no_gpx_unless_it_changed(self):
+        from coach.app import routes_store
+        save_upload(self.routes, 'climb.gpx', gpx(segments_profile(CLIMB)), self.db)
+        first = list_routes(self.routes, self.db)
+        routes_store._cache.clear()                                         # as after a restart
+        with mock.patch.object(routes_store, 'parse_gpx', side_effect=AssertionError('read again')):
+            self.assertEqual(list_routes(self.routes, self.db), first)       # straight from the database
+        rename(self.routes, 'climb.gpx', 'Mi puerto', self.db)
+        routes_store._cache.clear()
+        with mock.patch.object(routes_store, 'parse_gpx', side_effect=AssertionError('read again')):
+            self.assertEqual(list_routes(self.routes, self.db)[0]['name'], 'Mi puerto')
+        path = self.routes / 'climb.gpx'
+        path.write_bytes(gpx(segments_profile(OTHER), name='Cambiada'))
+        os.utime(path, (path.stat().st_atime, path.stat().st_mtime + 5))
+        [changed] = list_routes(self.routes, self.db)                       # changed: read and catalogued again
+        self.assertEqual((changed['name'], changed['gpxName']), ('Cambiada', 'Cambiada'))
+
     def test_a_generated_route_keeps_its_settings(self):
         out = generate(self.routes, {'mode': 'custom', 'distanceKm': 10, 'gainM': 100, 'climbs': 1, 'avgGrade': 5, 'maxGrade': 8, 'save': True,
                                      'name': 'Prueba'}, self.db)

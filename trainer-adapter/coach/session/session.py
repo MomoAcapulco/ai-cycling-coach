@@ -3,8 +3,9 @@
 - start → a 1 Hz sampler writes ``session_<UTC stamp>.csv`` in the recordings folder (same columns as the
   older recordings plus the gear, so the file can be replayed), and the raw Bluetooth capture runs too if
   enabled. pause/resume stop and restart the clock: paused time is not recorded and does not count.
-- finish (button, settings change, app exit, or the safety limit of 4 h) → CSV closed and
-  ``session_<stamp>.json`` written with the summary (coach/session/metrics.py).
+- finish (button, settings change, app exit, or the safety limit of 4 h) → CSV closed and the summary
+  (coach/session/metrics.py) saved in the local database (coach/session/session_store.py). Until 16-11 it was
+  ``session_<stamp>.json`` next to the CSV.
 """
 import csv
 import json
@@ -39,8 +40,9 @@ class SessionManager:
                  capture=None, clock=monotonic, now=lambda: datetime.now(timezone.utc),
                  max_seconds=MAX_SESSION_SECONDS, sample_seconds=SAMPLE_SECONDS,
                  rider_kg: Callable[[], Optional[float]] = lambda: None,
-                 extra: Callable[[], dict] = lambda: {}):
+                 extra: Callable[[], dict] = lambda: {}, db_path=None):
         self.reading, self.folder, self.ftp, self.capture = reading, Path(folder), ftp, capture
+        self.db_path = db_path      # None: the rider's database
         self.extra = extra          # more for the summary at the end (the workout ridden and how it went)
         self.rider_kg = rider_kg
         self.clock, self.now, self.max_seconds, self.sample_seconds = clock, now, max_seconds, sample_seconds
@@ -117,7 +119,12 @@ class SessionManager:
                 summary.update(self.extra() or {})
             except Exception as exc:  # the summary must be written whatever happens
                 print(f'WARNING: session summary extra failed: {exc}', flush=True)
-            (self.folder / f'{self.stem}.json').write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding='utf-8')
+            try:
+                from coach.session.session_store import SessionStore
+                SessionStore(self.db_path).save(summary)
+            except Exception as exc:  # never lose a ride: the summary goes next to the CSV, to be imported later
+                print(f'WARNING: session summary not saved in the database ({exc}); written to {self.stem}.json', flush=True)
+                (self.folder / f'{self.stem}.json').write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding='utf-8')
             self.last_summary = summary
             return summary
 
@@ -179,13 +186,15 @@ class SessionManager:
             return self.snapshot_unlocked()
 
 
-def save_feedback(folder: Path, stem: str, body: dict) -> dict:
+def save_feedback(folder: Path, stem: str, body: dict, db_path=None) -> dict:
     """How the session felt: ``rpe`` (perceived effort 1–10, Borg CR10 like Strava and TrainingPeaks; null clears it)
     and an optional ``note``. Kept in the session summary («feedback»); never changes the metrics."""
+    from coach.session.session_store import SessionStore
     if not SESSION_STEM.fullmatch(stem or ''):
         raise FileNotFoundError(stem)
-    path = Path(folder) / f'{stem}.json'
-    summary = json.loads(path.read_text(encoding='utf-8'))      # FileNotFoundError when there is no such session
+    store = SessionStore(db_path)
+    if store.get(stem) is None:
+        raise FileNotFoundError(stem)
     rpe, note = body.get('rpe'), body.get('note', '')
     if rpe is not None and (isinstance(rpe, bool) or not isinstance(rpe, int) or not 1 <= rpe <= 10):
         raise ValueError('rpe must be a whole number from 1 to 10, or null')
@@ -195,32 +204,40 @@ def save_feedback(folder: Path, stem: str, body: dict) -> dict:
         raise ValueError(f'note must be a text of at most {MAX_NOTE} characters')
     feedback = {'rpe': rpe, 'note': note.strip() or None,
                 'updatedUtc': datetime.now(timezone.utc).isoformat(timespec='seconds')}
-    summary['feedback'] = feedback
-    tmp = path.with_name(path.name + '.tmp')
-    tmp.write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding='utf-8')
-    tmp.replace(path)
+    store.update(stem, {'feedback': feedback})
     return feedback
 
 
-def delete_session(folder: Path, stem: str) -> dict:
-    """Move a finished session (CSV, summary, Bluetooth capture) to the trash of the recordings folder."""
+def delete_session(folder: Path, stem: str, db_path=None) -> dict:
+    """Move a finished session's files (CSV, Bluetooth capture) to the trash of the recordings folder; in the
+    database it is marked deleted, so it no longer counts in the history and the load."""
     from coach.app.routes_store import to_trash
-    if not SESSION_STEM.fullmatch(stem or '') or not (Path(folder) / f'{stem}.json').is_file():
+    from coach.session.session_store import SessionStore
+    store = SessionStore(db_path)
+    if not SESSION_STEM.fullmatch(stem or '') or store.get(stem) is None:
         raise FileNotFoundError(stem)
     moved = to_trash(folder, [f'{stem}.csv', f'{stem}.json', f'{stem}_ble_raw.jsonl'])
+    store.mark_deleted(stem)
     return {'deleted': stem, 'moved': moved}
 
 
-def list_sessions(folder: Path):
+def list_sessions(folder: Path, db_path=None, limit=None, offset=0):
     """Finished sessions, newest first: their summary plus the files that exist."""
-    folder = Path(folder)
-    out = []
-    for path in sorted(folder.glob('session_*.json'), reverse=True):
-        try:
-            summary = json.loads(path.read_text(encoding='utf-8'))
-        except (OSError, ValueError):
-            continue
-        files = [name for name in (summary.get('csv'), summary.get('rawCapture'), path.name)
-                 if name and (folder / name).is_file()]
-        out.append({**summary, 'files': files})
-    return out
+    return sessions_page(folder, db_path, limit, offset)[0]
+
+
+# A test: a few seconds, or no work and almost no distance (the Sessions page hides them unless asked)
+REAL_SESSION = 'a.elapsed_s >= 60 AND (COALESCE(a.work_kj, 0) > 0 OR COALESCE(a.distance_m, 0) >= 50)'
+
+
+def sessions_page(folder: Path, db_path=None, limit=None, offset=0, hide_tests=False):
+    """(sessions, total): one page of the finished sessions, newest first (without the tests if asked)."""
+    from coach.session.session_store import SessionStore, with_files
+    summaries, total = SessionStore(db_path).list(limit, offset, where=REAL_SESSION if hide_tests else '')
+    return [with_files(summary, folder) for summary in summaries], total
+
+
+def count_tests(db_path=None) -> int:
+    from coach.session.session_store import SessionStore
+    store = SessionStore(db_path)
+    return store.list(0)[1] - store.list(0, where=REAL_SESSION)[1]

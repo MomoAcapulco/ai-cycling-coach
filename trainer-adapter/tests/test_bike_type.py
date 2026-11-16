@@ -106,7 +106,7 @@ class RuntimeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             store = ProfileStore(Path(folder) / 'profile.json')
             store.update({'bikeType': 'MTB'})
-            runtime = AdapterRuntime(EnvConfig(record_dir=Path(folder), routes_dir=Path(folder) / 'r'),
+            runtime = AdapterRuntime(EnvConfig(history_db=Path(folder) / 'coach.db', record_dir=Path(folder), routes_dir=Path(folder) / 'r'),
                                      Settings(mode='WAHOO', gear_control_enabled=True), start_workers=False,
                                      profile_store=store).start()
             httpd = make_server('127.0.0.1', 0, runtime)

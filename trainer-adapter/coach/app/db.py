@@ -200,7 +200,17 @@ def _v2(db: sqlite3.Connection):
     ''')
 
 
-MIGRATIONS = {1: _v1, 2: _v2}
+def _v3(db: sqlite3.Connection):
+    """Routes: what the list shows (summary and small profile, ``listing``) with the size and time of the GPX it
+    came from, so listing the routes does not read every GPX again (1 s for six race GPX the first time)."""
+    _run_script(db, '''
+        ALTER TABLE routes ADD COLUMN listing TEXT;
+        ALTER TABLE routes ADD COLUMN file_size INTEGER;
+        ALTER TABLE routes ADD COLUMN file_mtime REAL
+    ''')
+
+
+MIGRATIONS = {1: _v1, 2: _v2, 3: _v3}
 SCHEMA_VERSION = max(MIGRATIONS)
 
 

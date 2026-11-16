@@ -8,6 +8,7 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from coach.workouts.structured import LIBRARY, Block, StructuredWorkout, WorkoutDef, watts
+from coach.session.session_store import SessionStore
 
 
 class Clock:
@@ -167,7 +168,7 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(workout.results[1]['compliancePct'], 100)      # the simulated rider follows the target
         self.assertEqual(workout.results[1]['inRangePct'], 100)
         self.runtime.session.finish()                                   # finishing the session ends the workout
-        saved = json.loads(next(self.folder.glob('session_*.json')).read_text())
+        [saved], _total = SessionStore(self.runtime.env.history_db).list()
         self.assertEqual((saved['workout']['type'], saved['workout']['endReason']), ('STRUCTURED', 'session finished'))
         self.assertEqual(saved['workout']['workCompliancePct'], 100)
         self.assertEqual(self.call('/workout/clear'), {'workout': None})

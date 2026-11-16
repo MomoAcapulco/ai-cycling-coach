@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { api } from '../api';
+import { api, type Page } from '../api';
 import { clock, fmt } from '../format';
 import type { Activity, ActivityType, HistoryWeek, LoadReport } from '../types';
 import { LoadSection } from '../components/LoadSection';
 import { RPE_LABELS, rpeColor } from '../components/EffortPicker';
+import { Pager } from '../components/Pager';
 
 const TYPE_LABEL: Record<ActivityType, string> = {
   ride: 'Bici', virtual_ride: 'Rodillo / virtual', run: 'Carrera', strength: 'Fuerza', workout: 'Entrenamiento', other: 'Otro',
@@ -68,19 +69,27 @@ export function History() {
   const [filter, setFilter] = useState<ActivityType | 'all'>('all');
   const [error, setError] = useState('');
   const [load, setLoad] = useState<LoadReport | null>(null);
-  const [limit, setLimit] = useState(30);
+  const [page, setPage] = useState<Page | null>(null);
+  const [types, setTypes] = useState<Record<string, number>>({});
 
-  useEffect(() => {
-    Promise.all([api.history(), api.historyWeeks()])
-      .then(([h, w]) => { setActivities(h.activities); setCounts(h.counts); setWeeks(w.weeks); })
+  // The list comes a page at a time, filtered by the server; the weekly chart and the load use everything.
+  const loadPage = (offset: number, type: ActivityType | 'all' = filter) =>
+    api.history(offset, type === 'all' ? null : type)
+      .then((h) => { setActivities(h.activities); setCounts(h.counts); setTypes(h.types); setPage(h); })
       .catch((e) => setError(`No se pudo leer el historial: ${e instanceof Error ? e.message : e}`));
+  useEffect(() => {
+    void loadPage(0);
+    api.historyWeeks(filter === 'all' ? null : filter).then((w) => setWeeks(w.weeks))   // the totals follow the filter
+      .catch((e) => setError(`No se pudo leer el historial: ${e instanceof Error ? e.message : e}`));
+  }, [filter]);
+  useEffect(() => {
     api.historyLoad(120).then(setLoad).catch((e) => setError(`No se pudo calcular la carga: ${e instanceof Error ? e.message : e}`));
   }, []);
   const loads = useMemo(() => new Map((load?.activities ?? []).map((a) => [a.id, a])), [load]);
   const METHOD: Record<string, string> = { power: 'potencia', hr: 'pulso', hr_avg: 'pulso medio', estimate: 'estimada' };
 
-  const shown = useMemo(() => (activities ?? []).filter((a) => filter === 'all' || a.type === filter), [activities, filter]);
-  const present = useMemo(() => ORDER.filter((t) => (activities ?? []).some((a) => a.type === t)), [activities]);
+  const shown = activities ?? [];
+  const present = useMemo(() => ORDER.filter((t) => (types[t] ?? 0) > 0), [types]);
 
   return (
     <div className="admin">
@@ -94,22 +103,23 @@ export function History() {
       </div>
       {error && <div className="alert">{error}</div>}
       {load && <LoadSection report={load} />}
+      <div className="admin-actions">
+        <button className={filter === 'all' ? 'primary' : ''} onClick={() => setFilter('all')}>Todo</button>
+        {present.map((t) => <button key={t} className={filter === t ? 'primary' : ''} onClick={() => setFilter(t)}>{TYPE_LABEL[t]} ({types[t]})</button>)}
+      </div>
+      {filter !== 'all' && <p className="tiny">El filtro se aplica a la lista y a las horas por semana. La forma, la fatiga y la frescura (arriba) cuentan siempre todo lo que haces: el cansancio de correr también se nota en la bici.</p>}
       <section className="panel">
-        <div className="panel-heading"><h2>Horas por semana</h2><span>ÚLTIMAS {WEEKS_SHOWN} SEMANAS</span></div>
+        <div className="panel-heading"><h2>Horas por semana{filter !== 'all' ? ` · ${TYPE_LABEL[filter]}` : ''}</h2><span>ÚLTIMAS {WEEKS_SHOWN} SEMANAS</span></div>
         <WeeksChart weeks={weeks} />
         <div className="profile-legend">
           {present.map((t) => <span key={t}><span className="swatch" style={{ background: TYPE_COLOR[t] }} /> {TYPE_LABEL[t]}</span>)}
         </div>
       </section>
-      <div className="admin-actions">
-        <button className={filter === 'all' ? 'primary' : ''} onClick={() => setFilter('all')}>Todo</button>
-        {present.map((t) => <button key={t} className={filter === t ? 'primary' : ''} onClick={() => setFilter(t)}>{TYPE_LABEL[t]}</button>)}
-      </div>
       <section className="panel">
         <table className="devices history-table">
           <thead><tr><th>Fecha</th><th>Tipo</th><th>Nombre</th><th>Tiempo</th><th>Distancia</th><th>Desnivel</th><th>Potencia (NP)</th><th>Pulso</th><th>Carga</th><th>Esfuerzo</th></tr></thead>
           <tbody>
-            {shown.slice(0, limit).map((a) => (
+            {shown.map((a) => (
               <tr key={a.id}>
                 <td>{date(a.start_utc)}</td>
                 <td><span className="swatch" style={{ background: TYPE_COLOR[a.type] }} /> {TYPE_LABEL[a.type]}</td>
@@ -130,9 +140,7 @@ export function History() {
           </tbody>
         </table>
         {activities && shown.length === 0 && <p className="muted">No hay actividades de este tipo.</p>}
-        {shown.length > limit && (
-          <div className="admin-actions"><button onClick={() => setLimit(limit + 50)}>Ver más ({shown.length - limit} restantes)</button></div>
-        )}
+        <Pager page={page} label="actividades" onPage={(offset) => void loadPage(offset)} />
       </section>
     </div>
   );

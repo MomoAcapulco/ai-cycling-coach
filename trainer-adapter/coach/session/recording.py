@@ -129,8 +129,9 @@ class CsvReplay:
 
     Nothing in this class touches the trainer or Bluetooth devices.
     """
-    def __init__(self, filename, clock=monotonic):
+    def __init__(self, filename, clock=monotonic, db_path=None):
         from bisect import bisect_right
+        self.db_path = db_path          # where the summary of a session is (None: the rider's database)
         self.clock = clock
         self.lock = Lock()
         path = Path(filename).expanduser()
@@ -227,7 +228,15 @@ class CsvReplay:
         return {'durationSeconds': self.duration, 'samples': samples, 'gradeKind': kind, 'routes': self._routes()}
 
     def _routes(self):
-        """The routes ridden in the session (its summary, next to the CSV), to draw them in the replay."""
+        """The routes ridden in the session (its summary in the database; a converted GPX ride: the JSON of its
+        conversion, next to the CSV), to draw them in the replay."""
+        if self.filename.name.startswith('session_'):
+            try:
+                from coach.session.session_store import SessionStore
+                summary = SessionStore(self.db_path).get(self.filename.stem, include_deleted=True) or {}
+                return summary.get('routes') or []
+            except Exception:                              # the replay goes on without its route
+                return []
         try:
             summary = json.loads(self.filename.with_suffix('.json').read_text(encoding='utf-8'))
             return summary.get('routes') or []
