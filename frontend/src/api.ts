@@ -1,4 +1,4 @@
-import type { ActiveRoute, Activity, HistoryWeek, RouteSummary } from './types';
+import type { ActiveRoute, Activity, HistoryWeek, LoadReport, RouteSummary } from './types';
 import type { AdminState, DevicesState, ProfileState, Recording, RiderProfile, Session, SessionSummary, Settings, Telemetry } from './types';
 
 const BASE = '/api/trainer';
@@ -78,6 +78,7 @@ export const api = {
   saveTestFtp: () => request<{ ftpWatts: number }>('/workout/ftp/save', { method: 'POST' }),
   clearWorkout: () => request<{ workout: null }>('/workout/clear', { method: 'POST' }),
   history: () => request<{ activities: Activity[]; counts: Record<string, number>; database: string }>('/history'),
+  historyLoad: (days = 180) => request<LoadReport>(`/history/load?days=${days}`),
   historyWeeks: () => request<{ weeks: HistoryWeek[] }>('/history/weeks'),
   routes: () => request<{ routes: RouteSummary[]; folder: string; current: string | null; available: boolean }>('/routes'),
   uploadRoute: (file: File) =>

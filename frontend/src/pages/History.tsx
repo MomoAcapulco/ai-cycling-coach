@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
 import { clock, fmt } from '../format';
-import type { Activity, ActivityType, HistoryWeek } from '../types';
+import type { Activity, ActivityType, HistoryWeek, LoadReport } from '../types';
+import { LoadSection } from '../components/LoadSection';
 
 const TYPE_LABEL: Record<ActivityType, string> = {
   ride: 'Bici', virtual_ride: 'Rodillo / virtual', run: 'Carrera', strength: 'Fuerza', workout: 'Entrenamiento', other: 'Otro',
@@ -65,12 +66,16 @@ export function History() {
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [filter, setFilter] = useState<ActivityType | 'all'>('all');
   const [error, setError] = useState('');
+  const [load, setLoad] = useState<LoadReport | null>(null);
 
   useEffect(() => {
     Promise.all([api.history(), api.historyWeeks()])
       .then(([h, w]) => { setActivities(h.activities); setCounts(h.counts); setWeeks(w.weeks); })
       .catch((e) => setError(`No se pudo leer el historial: ${e instanceof Error ? e.message : e}`));
+    api.historyLoad(120).then(setLoad).catch((e) => setError(`No se pudo calcular la carga: ${e instanceof Error ? e.message : e}`));
   }, []);
+  const loads = useMemo(() => new Map((load?.activities ?? []).map((a) => [a.id, a])), [load]);
+  const METHOD: Record<string, string> = { power: 'potencia', hr: 'pulso', hr_avg: 'pulso medio', estimate: 'estimada' };
 
   const shown = useMemo(() => (activities ?? []).filter((a) => filter === 'all' || a.type === filter), [activities, filter]);
   const present = useMemo(() => ORDER.filter((t) => (activities ?? []).some((a) => a.type === t)), [activities]);
@@ -86,6 +91,7 @@ export function History() {
         </div>
       </div>
       {error && <div className="alert">{error}</div>}
+      {load && <LoadSection report={load} />}
       <section className="panel">
         <div className="panel-heading"><h2>Horas por semana</h2><span>ÚLTIMAS {WEEKS_SHOWN} SEMANAS</span></div>
         <WeeksChart weeks={weeks} />
@@ -99,7 +105,7 @@ export function History() {
       </div>
       <section className="panel">
         <table className="devices history-table">
-          <thead><tr><th>Fecha</th><th>Tipo</th><th>Nombre</th><th>Tiempo</th><th>Distancia</th><th>Desnivel</th><th>Potencia (NP)</th><th>Pulso</th></tr></thead>
+          <thead><tr><th>Fecha</th><th>Tipo</th><th>Nombre</th><th>Tiempo</th><th>Distancia</th><th>Desnivel</th><th>Potencia (NP)</th><th>Pulso</th><th>Carga</th></tr></thead>
           <tbody>
             {shown.map((a) => (
               <tr key={a.id}>
@@ -111,6 +117,9 @@ export function History() {
                 <td>{a.ascent_m ? `${fmt(a.ascent_m, 0)} m` : '—'}</td>
                 <td>{a.has_power ? `${fmt(a.avg_power, 0)} W (${fmt(a.np, 0)})` : '—'}</td>
                 <td>{a.avg_hr ? `${fmt(a.avg_hr, 0)} / ${fmt(a.max_hr, 0)}` : '—'}</td>
+                <td title={loads.get(a.id)?.duplicateOf ? 'Grabada dos veces: cuenta la otra' : `Calculada con ${METHOD[loads.get(a.id)?.method ?? ''] ?? '—'}`}>
+                  {loads.get(a.id)?.duplicateOf ? 'duplicada' : loads.has(a.id) ? `${fmt(loads.get(a.id)?.tss, 0)} · ${METHOD[loads.get(a.id)?.method ?? '']}` : '—'}
+                </td>
               </tr>
             ))}
           </tbody>

@@ -169,6 +169,9 @@ export type RiderProfile = {
   minGradePercent: number;
   gradeTransitionMetersPerPercent: number;
   bikeType: BikeType;
+  restingHeartRate?: number | null;
+  maxHeartRate?: number | null;
+  thresholdHeartRate?: number | null;
 };
 
 export type BikeType = 'ROAD' | 'MTB';
@@ -229,6 +232,20 @@ export type Activity = {
 
 export type HistoryWeek = {
   week: string; hours: Partial<Record<ActivityType, number>>; activities: number; distanceKm: number; ascentM: number; workKj: number;
+};
+
+export type LoadDay = { date: string; tss: number; ctl: number; atl: number; tsb: number };
+
+export type LoadReport = {
+  params: {
+    ftp: number | null; ftp_source: 'profile' | 'history' | null; hr_rest: number; hr_rest_source: 'profile' | 'default';
+    hr_max: number | null; hr_max_source: 'profile' | 'history' | null; lthr: number | null; lthr_source: 'profile' | 'estimate' | null;
+  };
+  today: { ctl: number; atl: number; tsb: number; ctlChange7d: number | null };
+  days: LoadDay[];
+  activities: { id: string; tss: number; method: 'power' | 'hr' | 'hr_avg' | 'estimate'; duplicateOf: string | null }[];
+  methods: Record<string, number>;
+  duplicates: number;
 };
 
 export type DeviceRole = 'trainer' | 'heart_rate' | 'zwift_left' | 'zwift_right';

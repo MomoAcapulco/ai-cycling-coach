@@ -25,12 +25,18 @@ LIMITS = {
     'min_grade_percent': (-10.0, 0.0),
     # Road grade transitions by distance (coach/session/virtual_ride.py): metres for each 1 % of change.
     'grade_transition_m_per_percent': (5.0, 100.0),
+    # Heart rate (training load without power, coach/history/load.py): all optional, estimated when missing
+    'resting_heart_rate': (30, 100),
+    'max_heart_rate': (120, 230),
+    'threshold_heart_rate': (100, 220),
 }
+OPTIONAL_WHOLE = ('ftp_watts', 'resting_heart_rate', 'max_heart_rate', 'threshold_heart_rate')
 FIELDS = {'riderWeightKg': 'rider_weight_kg', 'bikeWeightKg': 'bike_weight_kg', 'ftpWatts': 'ftp_watts',
           'drivetrain': 'drivetrain', 'gradeDifficultyPercent': 'grade_difficulty_percent',
           'gradeDescentFactorPercent': 'grade_descent_factor_percent', 'maxGradePercent': 'max_grade_percent',
           'minGradePercent': 'min_grade_percent', 'gradeTransitionMetersPerPercent': 'grade_transition_m_per_percent',
-          'bikeType': 'bike_type'}
+          'bikeType': 'bike_type', 'restingHeartRate': 'resting_heart_rate', 'maxHeartRate': 'max_heart_rate',
+          'thresholdHeartRate': 'threshold_heart_rate'}
 WHOLE_NUMBERS = ('grade_difficulty_percent', 'grade_descent_factor_percent')
 DECIMALS = ('rider_weight_kg', 'bike_weight_kg', 'max_grade_percent', 'min_grade_percent',
             'grade_transition_m_per_percent')
@@ -48,6 +54,9 @@ class RiderProfile:
     min_grade_percent: float = -5.0
     grade_transition_m_per_percent: float = 20.0  # 0 → 5 % over ~100 m, like a real road
     bike_type: str = 'ROAD'
+    resting_heart_rate: Optional[int] = None
+    max_heart_rate: Optional[int] = None
+    threshold_heart_rate: Optional[int] = None
 
     @property
     def total_mass_kg(self) -> float:
@@ -59,7 +68,9 @@ class RiderProfile:
                 'gradeDifficultyPercent': self.grade_difficulty_percent,
                 'gradeDescentFactorPercent': self.grade_descent_factor_percent,
                 'maxGradePercent': self.max_grade_percent, 'minGradePercent': self.min_grade_percent,
-                'gradeTransitionMetersPerPercent': self.grade_transition_m_per_percent, 'bikeType': self.bike_type}
+                'gradeTransitionMetersPerPercent': self.grade_transition_m_per_percent, 'bikeType': self.bike_type,
+                'restingHeartRate': self.resting_heart_rate, 'maxHeartRate': self.max_heart_rate,
+                'thresholdHeartRate': self.threshold_heart_rate}
 
     def updated(self, data: dict) -> 'RiderProfile':
         if not isinstance(data, dict):
@@ -78,9 +89,9 @@ class RiderProfile:
             elif field == 'bike_type':
                 if value not in BIKE_TYPES:
                     raise ValueError(f'bikeType must be one of {", ".join(BIKE_TYPES)}')
-            elif field == 'ftp_watts':
+            elif field in OPTIONAL_WHOLE:
                 if value is not None and (type(value) is not int):
-                    raise ValueError('ftpWatts must be a whole number of watts or empty')
+                    raise ValueError(f'{key} must be a whole number or empty')
             elif field in WHOLE_NUMBERS:
                 if type(value) is not int:
                     raise ValueError(f'{key} must be a whole number')

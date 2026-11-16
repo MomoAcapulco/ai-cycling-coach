@@ -257,6 +257,9 @@ class Handler(BaseHTTPRequestHandler):
         if path in ('/history', '/history/weeks') and self.admin is not None:
             self.respond(self.history_json(path.endswith('/weeks')))
             return
+        if path == '/history/load' and self.admin is not None:
+            self.respond(self.load_json())
+            return
         if path == '/sessions' and self.admin is not None:
             from coach.session.session import list_sessions
             self.respond({'sessions': list_sessions(self.admin.env.record_dir)})
@@ -296,12 +299,26 @@ class Handler(BaseHTTPRequestHandler):
             'trainerStatus': reading['status']}
         self.respond(data)
 
-    def history_json(self, weeks: bool):
-        """Every activity (this app's sessions are added on the fly), or totals per week (Monday to Sunday)."""
+    def history_store(self):
         from coach.history.store import HistoryStore, import_app_sessions
         env = self.admin.env
         store = HistoryStore(env.history_db) if env.history_db else HistoryStore.default()
         import_app_sessions(store, env.record_dir)
+        return store
+
+    def load_json(self):
+        """Training load per activity and fitness / fatigue / form (coach/history/load.py)."""
+        from coach.app.rider_profile import RiderProfile
+        from coach.history.load import enrich_missing, load_report
+        store = self.history_store()
+        enrich_missing(store, store.path.parent, self.admin.env.record_dir)   # only what is new (or a first time)
+        profile = self.admin.profile_store.load()[0] if self.admin.profile_store else RiderProfile()
+        days = int((parse_qs(urlsplit(self.path).query).get('days') or ['180'])[0])
+        return load_report(store.list(100000), profile, days=max(7, min(days, 3650)))
+
+    def history_json(self, weeks: bool):
+        """Every activity (this app's sessions are added on the fly), or totals per week (Monday to Sunday)."""
+        store = self.history_store()
         rows = store.list(5000)
         if not weeks:
             return {'activities': rows[:500], 'counts': store.count_by(), 'database': str(store.path)}

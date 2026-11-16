@@ -8,6 +8,7 @@ type Draft = {
   gradeDifficultyPercent: string; gradeDescentFactorPercent: string; maxGradePercent: string; minGradePercent: string;
   gradeTransitionMetersPerPercent: string;
   bikeType: BikeType;
+  restingHeartRate: string; maxHeartRate: string; thresholdHeartRate: string;
 };
 
 const toDraft = (p: RiderProfile): Draft => ({
@@ -17,7 +18,11 @@ const toDraft = (p: RiderProfile): Draft => ({
   maxGradePercent: String(p.maxGradePercent), minGradePercent: String(p.minGradePercent),
   gradeTransitionMetersPerPercent: String(p.gradeTransitionMetersPerPercent),
   bikeType: p.bikeType ?? 'ROAD',
+  restingHeartRate: p.restingHeartRate == null ? '' : String(p.restingHeartRate),
+  maxHeartRate: p.maxHeartRate == null ? '' : String(p.maxHeartRate),
+  thresholdHeartRate: p.thresholdHeartRate == null ? '' : String(p.thresholdHeartRate),
 });
+const optionalWhole = (text: string) => (text.trim() === '' ? null : Number(text.trim()));
 
 /** Spanish keyboards type "9,5": accept a comma as the decimal separator. */
 const number = (text: string) => Number(text.trim().replace(',', '.'));
@@ -51,7 +56,9 @@ export function ProfileSection() {
   const maxGrade = number(draft.maxGradePercent);
   const minGrade = number(draft.minGradePercent);
   const transition = number(draft.gradeTransitionMetersPerPercent);
-  const gradeOk = Number.isFinite(transition) && Number.isInteger(difficulty) && Number.isInteger(descent) && Number.isFinite(maxGrade) && Number.isFinite(minGrade);
+  const hrRest = optionalWhole(draft.restingHeartRate), hrMax = optionalWhole(draft.maxHeartRate), hrThreshold = optionalWhole(draft.thresholdHeartRate);
+  const hrOk = [hrRest, hrMax, hrThreshold].every((v) => v === null || Number.isInteger(v));
+  const gradeOk = hrOk && Number.isFinite(transition) && Number.isInteger(difficulty) && Number.isInteger(descent) && Number.isFinite(maxGrade) && Number.isFinite(minGrade);
   const numbersOk = Number.isFinite(rider) && Number.isFinite(bike) && (ftp === null || Number.isInteger(ftp)) && gradeOk;
   const dirty = JSON.stringify(draft) !== JSON.stringify(toDraft(saved));
 
@@ -62,6 +69,7 @@ export function ProfileSection() {
         riderWeightKg: rider, bikeWeightKg: bike, ftpWatts: ftp, drivetrain: draft.drivetrain,
         gradeDifficultyPercent: difficulty, gradeDescentFactorPercent: descent, maxGradePercent: maxGrade, minGradePercent: minGrade,
         gradeTransitionMetersPerPercent: transition, bikeType: draft.bikeType,
+        restingHeartRate: hrRest, maxHeartRate: hrMax, thresholdHeartRate: hrThreshold,
       });
       setSaved(result.profile);
       setIsSaved(true);
@@ -108,6 +116,20 @@ export function ProfileSection() {
         y con tacos sobre tierra: más lento en llano (con 200 W y 90 kg en total, unos 27 km/h en vez de 32) y el llano se nota más duro en
         el rodillo. En subida casi no cambia. Los valores de BTT son una estimación, aún sin validar con el rodillo.
       </p>
+      <h3 className="subheading">Pulso (para la carga de entrenamiento)</h3>
+      <div className="profile-grid">
+        <label className="field-block">En reposo (opcional)
+          <span><input inputMode="numeric" placeholder="60" value={draft.restingHeartRate} onChange={(e) => set({ restingHeartRate: e.target.value })} /> ppm</span>
+        </label>
+        <label className="field-block">Máximo (opcional)
+          <span><input inputMode="numeric" placeholder="del historial" value={draft.maxHeartRate} onChange={(e) => set({ maxHeartRate: e.target.value })} /> ppm</span>
+        </label>
+        <label className="field-block">Umbral (opcional)
+          <span><input inputMode="numeric" placeholder="90 % del máximo" value={draft.thresholdHeartRate} onChange={(e) => set({ thresholdHeartRate: e.target.value })} /> ppm</span>
+        </label>
+      </div>
+      <p className="tiny">Con ellos se calcula la carga de lo que haces sin potencia (bici en la calle, carrera, fuerza). Si los dejas
+        vacíos se estiman: el máximo con tu historial, el umbral como el 90 % del máximo y 60 en reposo. El reposo, mídelo al despertar.</p>
       <h3 className="subheading">Pendiente en el rodillo</h3>
       <div className="profile-grid">
         <label className="field-block">Dificultad (0–100)

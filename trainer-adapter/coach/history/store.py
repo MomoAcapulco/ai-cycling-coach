@@ -25,6 +25,9 @@ COLUMNS = (
     ('avg_hr', 'REAL'), ('max_hr', 'REAL'), ('avg_cadence', 'REAL'), ('has_power', 'INTEGER'),
     ('has_hr', 'INTEGER'), ('device', 'TEXT'), ('strava_relative_effort', 'REAL'), ('file', 'TEXT'),
     ('imported_utc', 'TEXT'),
+    # read once from the activity file (coach/history/load.py), so the load can be recomputed instantly when the
+    # rider's FTP or heart-rate thresholds change: seconds at each heart rate, and the best 20 min power
+    ('hr_hist', 'TEXT'), ('best20_w', 'REAL'), ('enriched', 'INTEGER'),
 )
 TYPES = ('ride', 'virtual_ride', 'run', 'strength', 'workout', 'other')
 GAP_S = 3
@@ -38,6 +41,10 @@ class HistoryStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self._db() as db:
             db.execute(f"CREATE TABLE IF NOT EXISTS activities ({', '.join(f'{n} {t}' for n, t in COLUMNS)})")
+            present = {r[1] for r in db.execute('PRAGMA table_info(activities)')}
+            for name, kind in COLUMNS:                      # databases created by an earlier version
+                if name not in present:
+                    db.execute(f'ALTER TABLE activities ADD COLUMN {name} {kind}')
 
     @classmethod
     def default(cls):
@@ -74,6 +81,14 @@ class HistoryStore:
             query += ' ORDER BY start_utc DESC LIMIT ?'
             args.append(limit)
             return [dict(r) for r in db.execute(query, args)]
+
+    def update(self, activity_id: str, values: dict):
+        names = [n for n in values if n in {c for c, _ in COLUMNS} and n != 'id']
+        if not names:
+            return
+        with self.lock, self._db() as db:
+            db.execute(f"UPDATE activities SET {', '.join(f'{n} = ?' for n in names)} WHERE id = ?",
+                       [values[n] for n in names] + [activity_id])
 
     def count_by(self):
         with self.lock, self._db() as db:

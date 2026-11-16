@@ -75,6 +75,19 @@ Historial de versiones (lo que antes estaba en un README por versión). La más 
   - Al iniciar una sesión nueva, las gráficas, el perfil del recorrido y la pendiente máxima **empiezan de cero**, con el tiempo de la sesión. Antes arrastraban todo lo anterior. Al terminar, la última sesión se queda en pantalla hasta empezar otra.
   - Botones ±0,5 % de la pendiente: varias pulsaciones seguidas solo contaban una por segundo, porque cada pulsación sumaba a la última lectura de telemetría y el botón se bloqueaba mientras se enviaba. Ahora cada pulsación suma al instante y se envía una sola vez, 0,3 s después de la última, con el total. El deslizador no tenía el problema.
   - Pulsómetro: si no se ve la banda, el Panel ya dice qué comprobar (que esté puesta y humedecida, y que no esté conectada a un reloj, al móvil o a Zwift) y la terminal lo escribe una vez. Antes solo ponía «WAITING».
+- **Forma, fatiga y frescura** (`coach/history/load.py`, sección en Historial):
+  - Carga de cada actividad en unidades TSS:
+    - **con potencia** (bici, si hay FTP): horas × IF² × 100;
+    - **con pulso**: TRIMP de Banister segundo a segundo, escalado a 100 por hora en el umbral;
+    - **sin nada**: estimación por duración, marcada como tal.
+  - Forma (CTL, 42 días), fatiga (ATL, 7 días) y frescura (TSB, la de ayer), con su interpretación.
+  - Umbrales del perfil (nuevos campos opcionales de pulso en reposo, máximo y umbral). Si faltan, se estiman: FTP = 95 % del mejor tramo de 20 minutos del último año; pulso máximo del historial, descartando un pico suelto (en los datos reales, 195 frente a 181); umbral = 90 % del máximo. Siempre se indica de dónde sale cada uno.
+  - Las actividades grabadas dos veces cuentan una sola vez (2 en los datos reales: una salida de Zwift grabada también como «bici»).
+  - Validado con el «Esfuerzo relativo» de Strava en 57 actividades con pulso: correlación 1,00 (rangos 0,95); bici 1,00, fuerza 0,96, carrera 0,93.
+  - Corregido por el camino:
+    - la app de Strava graba el pulso cada 5 s, y la regla de huecos de la potencia (3 s) tiraba el 75 % de esos datos; ahora el pulso se arrastra hasta 30 s;
+    - una actividad con el pulso grabado 15 h más allá de su final ahora solo cuenta su parte.
+  - API `GET /history/load`.
 - **Test de FTP (rampa, sin ERG)** (`coach/workouts/ramp_test.py`, panel «Test de FTP» en el Panel):
   - Protocolo: 5 minutos suaves y luego escalones de 1 minuto desde 100 W (o el 40 % de tu FTP), +20 W por minuto. El objetivo se alcanza con las marchas; termina al dejar de pedalear 5 s o con «He terminado».
   - FTP = 75 % del mejor minuto de la rampa. Si la rampa dura menos de 3 minutos, no se da resultado.
