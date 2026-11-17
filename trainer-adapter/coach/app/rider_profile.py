@@ -160,11 +160,21 @@ class ProfileStore:
             print(f'WARNING: ignoring invalid profile in {self.path}: {exc}', flush=True)
             return RiderProfile(), False
 
-    def update(self, changes: dict):
+    def update(self, changes: dict, ftp_source: str = None):
+        """Save the changed profile. When the FTP changes, where it came from: 'test' (the ramp test), 'estimate'
+        (the FTP notice) or, by default, 'manual' (typed in the profile)."""
         profile, _ = self.load()
         new = profile.updated(changes)
-        self._write(new, datetime.now(timezone.utc).isoformat(timespec='seconds'))
+        source = None
+        if new.ftp_watts != profile.ftp_watts:
+            source = ftp_source or ('manual' if new.ftp_watts is not None else None)
+        self._write(new, datetime.now(timezone.utc).isoformat(timespec='seconds'), source, keep_source=source is None)
         return new
+
+    def ftp_source(self):
+        with self.lock, self._db() as conn:
+            row = conn.execute('SELECT ftp_source FROM profile WHERE id = 1').fetchone()
+        return row[0] if row else None
 
     def import_saved(self, data: dict, saved_utc: str = None) -> RiderProfile:
         """A profile saved by an earlier version (profile.json), as if it had been saved at ``saved_utc``."""
@@ -178,12 +188,15 @@ class ProfileStore:
             rows = conn.execute('SELECT valid_from_utc, data FROM profile_versions ORDER BY valid_from_utc, rowid').fetchall()
         return [(at, json.loads(data)) for at, data in rows]
 
-    def _write(self, profile: RiderProfile, at: str):
+    def _write(self, profile: RiderProfile, at: str, ftp_source: str = None, keep_source: bool = False):
         from coach.app import db
         values = [getattr(profile, field) for field in COLUMNS]
         columns = ', '.join(COLUMNS.values())
         with self.lock, self._db() as conn:
-            conn.execute(f"INSERT OR REPLACE INTO profile (id, {columns}, updated_utc) VALUES "
-                         f"(1, {', '.join('?' for _ in values)}, ?)", values + [at])
+            if keep_source:
+                row = conn.execute('SELECT ftp_source FROM profile WHERE id = 1').fetchone()
+                ftp_source = row[0] if row else None
+            conn.execute(f"INSERT OR REPLACE INTO profile (id, {columns}, ftp_source, updated_utc) VALUES "
+                         f"(1, {', '.join('?' for _ in values)}, ?, ?)", values + [ftp_source, at])
             conn.execute('INSERT INTO profile_versions (id, valid_from_utc, data) VALUES (?, ?, ?)',
-                         (db.new_id(), at, json.dumps(profile.to_json(), ensure_ascii=False)))
+                         (db.new_id(), at, json.dumps({**profile.to_json(), 'ftpSource': ftp_source}, ensure_ascii=False)))

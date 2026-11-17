@@ -210,7 +210,18 @@ def _v3(db: sqlite3.Connection):
     ''')
 
 
-MIGRATIONS = {1: _v1, 2: _v2, 3: _v3}
+def _v4(db: sqlite3.Connection):
+    """FTP estimates: what was proposed and the FTP the rider had then (to see how good the estimate is and what
+    the rider did with it)."""
+    _run_script(db, '''
+        ALTER TABLE ftp_estimates ADD COLUMN suggested_ftp_w INTEGER;
+        ALTER TABLE ftp_estimates ADD COLUMN profile_ftp_w INTEGER;
+        CREATE INDEX IF NOT EXISTS ftp_estimates_time ON ftp_estimates(computed_utc);
+        CREATE INDEX IF NOT EXISTS ftp_tests_time ON ftp_tests(tested_utc)
+    ''')
+
+
+MIGRATIONS = {1: _v1, 2: _v2, 3: _v3, 4: _v4}
 SCHEMA_VERSION = max(MIGRATIONS)
 
 

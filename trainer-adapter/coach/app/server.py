@@ -317,7 +317,7 @@ class Handler(BaseHTTPRequestHandler):
         if path.startswith('/sessions/') and self.admin is not None:
             self.send_session_file(path[len('/sessions/'):])
             return
-        if path in ('/admin/settings', '/admin/recordings', '/admin/profile'):
+        if path in ('/admin/settings', '/admin/profile'):
             if self.admin is None or (path == '/admin/profile' and self.admin.profile_store is None):
                 self.send_error(404)
                 return
@@ -325,12 +325,8 @@ class Handler(BaseHTTPRequestHandler):
                 profile, saved = self.admin.profile_store.load()
                 self.respond({'profile': profile.to_json(), 'saved': saved,
                               'profileFile': str(self.admin.profile_store.path)})
-            elif path == '/admin/settings':
-                self.respond(self.admin.describe())
             else:
-                from coach.app.recordings_store import list_recordings
-                self.respond({'recordings': list_recordings(self.admin.env.record_dir),
-                              'current': self.admin.settings.replay_file})
+                self.respond(self.admin.describe())
             return
         if path not in ('/telemetry', '/health', '/replay/session', '/replay/state'):
             self.send_error(404)
@@ -395,7 +391,11 @@ class Handler(BaseHTTPRequestHandler):
         store = self.history_store()
         enrich_missing(store, store.path.parent, self.admin.env.record_dir)
         profile = self.admin.profile_store.load()[0] if self.admin.profile_store else RiderProfile()
-        return ftp_advice(profile, store.list(100000))
+        rows = store.list(100000)
+        advice = ftp_advice(profile, rows)
+        from coach.history.ftp_log import record_estimate
+        record_estimate(store.path, advice, rows[0]['id'] if rows else None)   # only when it changed
+        return advice
 
     def history_json(self, weeks: bool):
         """Every activity (this app's sessions are added on the fly), or totals per week (Monday to Sunday)."""
@@ -528,7 +528,13 @@ class Handler(BaseHTTPRequestHandler):
                 self.respond(self.admin.update(self.read_json()))
                 return
             if path == '/admin/profile' and self.admin is not None and self.admin.profile_store is not None:
-                profile = self.admin.profile_store.update(self.read_json())
+                body = self.read_json()
+                source = body.pop('ftpSource', None) if isinstance(body, dict) else None
+                source = source if source in ('estimate',) else None          # 'test' only from the ramp test
+                profile = self.admin.profile_store.update(body, ftp_source=source)
+                if source == 'estimate' and profile.ftp_watts is not None:   # the rider took the FTP notice
+                    from coach.history.ftp_log import mark_estimate_accepted
+                    mark_estimate_accepted(self.admin.profile_store.path, profile.ftp_watts)
                 self.admin.profile_changed(profile)  # new grade difficulty/limits apply at once
                 self.respond({'profile': profile.to_json(), 'saved': True,
                               'profileFile': str(self.admin.profile_store.path)})
@@ -614,11 +620,6 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError(f'Not a usable GPX route: {exc}')
                 self.state.ride.start_route(route)
                 self.respond({'active': True, **route.summary()})
-                return
-            if path == '/admin/recordings' and self.admin is not None:
-                from coach.app.recordings_store import MAX_UPLOAD_BYTES, save_upload
-                name = (parse_qs(urlsplit(self.path).query).get('name') or [''])[0]
-                self.respond(save_upload(self.admin.env.record_dir, name, self.read_body(MAX_UPLOAD_BYTES)), 201)
                 return
             if path in ('/session/start', '/session/pause', '/session/resume', '/session/finish'):
                 from coach.session.session import SessionError

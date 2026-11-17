@@ -56,6 +56,14 @@ class SessionStore:
             conn.execute(f"INSERT OR REPLACE INTO sessions (activity_id, {', '.join(names)}) VALUES "
                          f"(?, {', '.join('?' for _ in names)})", [activity_id(stem)] + [values[n] for n in names])
             conn.execute('DELETE FROM session_routes WHERE activity_id = ?', (activity_id(stem),))
+            if workout.get('type') == 'RAMP_TEST' and workout.get('ftpW') is not None and not conn.execute(
+                    'SELECT 1 FROM ftp_tests WHERE activity_id = ?', (activity_id(stem),)).fetchone():
+                # the test of this session, for the history of the FTP (coach/history/ftp_log.py)
+                conn.execute('INSERT INTO ftp_tests (id, activity_id, tested_utc, protocol, ftp_w, best_minute_w, '
+                             'max_hr, indoor, accepted) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)',
+                             (db.new_id(), activity_id(stem), summary.get('finishedAtUtc') or summary.get('startedAtUtc'),
+                              'ramp', workout['ftpW'], workout.get('best60sW'), workout.get('maxHeartRate'),
+                              int(bool(workout.get('savedAsFtp')))))
             for ridden in summary.get('routes') or []:
                 route = conn.execute('SELECT id FROM routes WHERE file = ? ORDER BY deleted_utc IS NOT NULL, '
                                      'created_utc DESC LIMIT 1', (ridden.get('file'),)).fetchone()

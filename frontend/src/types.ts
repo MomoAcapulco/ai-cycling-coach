@@ -237,16 +237,6 @@ export type BikeType = 'ROAD' | 'MTB';
 
 export type ProfileState = { profile: RiderProfile; saved: boolean; profileFile: string };
 
-export type Recording = {
-  name: string;
-  path: string;
-  sizeBytes: number;
-  modifiedUtc: string;
-  valid: boolean;
-  samples: number | null;
-  durationSeconds: number | null;
-  error: string | null;
-};
 
 export type RememberedDevice = {
   address: string;

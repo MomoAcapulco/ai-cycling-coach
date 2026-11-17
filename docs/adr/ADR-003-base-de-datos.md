@@ -1,6 +1,6 @@
 # ADR-003 — Base de datos local (SQLite) y qué se queda como fichero
 
-**Estado:** Aceptado (16-11-2026). **Fase 1 hecha**: `coach.db` con todo el esquema y las actividades de `history.db`. **Fase 2 hecha**: perfil, ajustes, catálogo de rutas (esquema v2: `routes.file` no único, con `sha256`; v3: lo que muestra la lista, para no leer los GPX) y el resumen de cada sesión (2c). Fase 3: pantallas de privacidad. Fase 3: pantallas de privacidad. La parte de compartir está en
+**Estado:** Aceptado (16-11-2026). **Fase 1 hecha**: `coach.db` con todo el esquema y las actividades de `history.db`. **Fase 2 hecha**: perfil, ajustes, catálogo de rutas (esquema v2: `routes.file` no único, con `sha256`; v3: lo que muestra la lista, para no leer los GPX) y el resumen de cada sesión (2c). v4: `ftp_estimates` con lo propuesto y el FTP de entonces; tests y estimaciones de FTP ya se registran (`coach/history/ftp_log.py`). Fase 3: pantallas de privacidad. Fase 3: pantallas de privacidad. La parte de compartir está en
 `docs/PENDIENTES-sin-rodillo.md`, sección 10d.
 
 ## Contexto

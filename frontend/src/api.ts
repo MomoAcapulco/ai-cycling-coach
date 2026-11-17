@@ -1,5 +1,5 @@
 import type { ActiveRoute, Activity, HistoryWeek, LoadReport, RouteSummary, WorkoutLibrary, FtpAdvice, GeneratedRoute, SessionFeedback } from './types';
-import type { AdminState, DevicesState, ProfileState, Recording, RiderProfile, Session, SessionSummary, Settings, Telemetry } from './types';
+import type { AdminState, DevicesState, ProfileState, RiderProfile, Session, SessionSummary, Settings, Telemetry } from './types';
 
 const BASE = '/api/trainer';
 
@@ -63,15 +63,9 @@ export const api = {
   adminState: () => request<AdminState>('/admin/settings'),
   saveSettings: (changes: Partial<Settings>) => request<AdminState>('/admin/settings', json(changes)),
   resetSettings: () => request<AdminState>('/admin/settings/reset', { method: 'POST' }),
-  recordings: () => request<{ recordings: Recording[]; current: string | null }>('/admin/recordings'),
-  uploadRecording: (file: File) =>
-    request<Recording>(`/admin/recordings?name=${encodeURIComponent(file.name)}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/csv' },
-      body: file,
-    }),
   profile: () => request<ProfileState>('/admin/profile'),
-  saveProfile: (profile: Partial<RiderProfile>) => request<ProfileState>('/admin/profile', json(profile)),
+  /** ``ftpSource: 'estimate'``: the FTP comes from the FTP notice (kept with the FTP history, for the AI). */
+  saveProfile: (profile: Partial<RiderProfile> & { ftpSource?: 'estimate' }) => request<ProfileState>('/admin/profile', json(profile)),
   sessionAction: (action: 'start' | 'pause' | 'resume' | 'finish') =>
     request<Telemetry & Partial<SessionSummary>>(`/session/${action}`, { method: 'POST' }),
   sessions: (offset = 0, hideTests = true, limit = PAGE) =>

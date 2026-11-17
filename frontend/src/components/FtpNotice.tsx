@@ -23,7 +23,7 @@ export function FtpNotice({ always = false, replay = false, onChanged }: { alway
 
   const save = async (ftp: number) => {
     setBusy(true);
-    try { await api.saveProfile({ ftpWatts: ftp }); toast.ok(`FTP guardado: ${ftp} W.`); await load(); onChanged?.(); }
+    try { await api.saveProfile({ ftpWatts: ftp, ftpSource: 'estimate' }); toast.ok(`FTP guardado: ${ftp} W.`); await load(); onChanged?.(); }
     catch (e) { toast.error(`No se pudo guardar el FTP: ${e instanceof Error ? e.message : e}`); }
     finally { setBusy(false); }
   };

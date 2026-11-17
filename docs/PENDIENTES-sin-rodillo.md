@@ -205,12 +205,9 @@ alguien que envía una copia. Nada se sincroniza.
    - **sensaciones con casillas** (piernas, motivación, molestias, «dormí mal») (sí); la nota de texto, nunca;
    - perfiles de las rutas, sin coordenadas (sí).
 3. **Vista previa**: cuántas sesiones, qué fechas y un ejemplo de las filas tal como se enviarán.
-4. **Mínimo de datos**, contado solo con lo que haya marcado. Propuesta:
-   - al menos **10 sesiones de 20 minutos o más**, con potencia o con pulso;
-   - repartidas en **4 semanas o más**;
-   - con potencia o pulso en al menos el 80 % de cada sesión.
-   Si no llega: «¡Gracias! De momento son pocos datos para que la IA aprenda algo (te faltan 4 sesiones de 20 min).
-   Te avisamos cuando tengas suficientes.» El paquete no se genera, y el aviso es opcional y se puede apagar.
+4. **Cuántas sesiones: sin mínimo** (decidido 17-11): cada uno manda las que quiera y pueda. Cada envío lleva solo
+   lo nuevo desde el anterior. **Qué lleva cada sesión: el contrato de datos** (abajo): lo imprescindible para la IA
+   va siempre; una sesión que no lo tiene no se manda, y la vista previa dice por qué.
 5. **Generar el paquete** en la carpeta de datos. Lo **envía el usuario** (correo o subida): la app no manda nada sola.
 
 **Lo que necesita la IA y aún no se guarda** (decidido 16-11): las tablas se crean en la migración (10c), aunque las
@@ -231,6 +228,43 @@ pantallas para rellenarlas lleguen después, para no migrar dos veces.
 | `profile` | Edad (o año de nacimiento), altura y sexo, opcionales | Pulso máximo y recuperación (edad), resistencia al aire (altura), fisiología (sexo) |
 
 Todo se guarda completo en local; a la central solo va con permiso, por rangos y sin texto libre.
+
+**Contrato de datos** (decidido y cerrado 17-11): quitar todo lo sensible sin quitar nada de lo que la IA necesita. Cada
+campo está en uno de tres grupos; el paquete lleva su versión (`manifest.json`, `contract_version`) y un test
+comprueba que ningún campo de «nunca» sale y que todo lo imprescindible está.
+
+*Imprescindible* (va siempre al compartir; sin ello la sesión no se manda):
+
+| Dato | Forma en que sale | Para qué |
+|---|---|---|
+| Tipo de actividad | rodillo / bici en la calle / BTT / carrera / fuerza… | Cada una carga distinto |
+| Día | días desde la primera sesión compartida + día de la semana + franja (mañana, mediodía, tarde, noche) | Fatiga y forma (van por días); no se rinde igual a las 7 que a las 20 |
+| Duración y tiempo en movimiento | segundos | Todo lo demás se mide sobre esto |
+| Serie segundo a segundo | tiempo relativo, distancia, velocidad, cadencia, pendiente, altitud **relativa** (empieza en 0) | Qué se hizo y en qué terreno |
+| Potencia **o** pulso, al menos uno | vatios / ppm por segundo | Sin ninguno no se sabe la intensidad |
+| FTP de ese día | vatios exactos + origen (test, estimado, a mano) + rodillo o calle | Referencia de zonas, IF y TSS |
+| Peso | de 5 en 5 kg; la bici, de 2 en 2 kg | W/kg (de 10 en 10 fallaría hasta un 6 %); la bici pesa en las subidas |
+| Cómo se midió | tipo de sensor (potenciómetro / rodillo, banda / muñeca), rodillo controlado sí/no, dificultad de la pendiente y factor de bajadas, transmisión (Zwift Cog / cassette) | Saber qué datos son fiables, cómo se sentía la pendiente y cómo se usaban las marchas |
+| Mínimo de la sesión | al menos 5 minutos con datos | Una prueba de segundos no enseña nada |
+
+*Recomendado* (cada uno con su casilla, marcada por defecto; el pulso con su permiso aparte, es dato de salud):
+
+| Dato | Forma | Para qué |
+|---|---|---|
+| Pulso y sus umbrales | ppm por segundo; reposo, máximo y umbral | Carga sin potencia, deriva cardiaca, fatiga |
+| Esfuerzo y sensaciones | 1–10 y casillas (piernas, motivación, molestias, sueño) | Cómo le sentó, no solo qué hizo |
+| Edad, sexo, altura | de 5 en 5 años, opcional, de 5 en 5 cm | Recuperación, pulso máximo, aerodinámica |
+| Objetivo y resultado | tipo de carrera, distancia, desnivel, días hasta ella; tiempo, si terminó, esfuerzo | Lo que la IA aprende: qué preparación dio qué resultado |
+| Tests y estimaciones de FTP | valor, método, día relativo, si se aceptó | Si el plan funciona y cuánto acierta la estimación |
+| Días de enfermedad, lesión o viaje | día relativo y tipo (sin nota) | Que un hueco no parezca falta de forma |
+| Recomendaciones de la IA | qué propuso y si se hizo | Separar «no sirvió» de «no se siguió» |
+| Entrenamiento y cumplimiento | bloques, objetivo y cumplimiento | Qué tipo de sesión era |
+| Marchas | segundos por marcha | Cómo se rodó |
+| Temperatura | °C por segundo, si el dispositivo la graba (muchos Garmin y Wahoo) | Con calor el pulso sube sin que suba el esfuerzo |
+
+*Nunca*: coordenadas GPS (ni recortadas), altitud absoluta, fechas y horas exactas, nombres (de rutas, ficheros,
+entrenamientos propios), notas de texto, identificadores Bluetooth, seriales y nombres de dispositivos, peso o
+edad exactos, el texto del log del rodillo y la respuesta 512 del rodillo (lleva el peso).
 
 **Anonimización** (y un test que lo comprueba con `mask_personal_data.py`):
 - **Donante**: un identificador aleatorio que se crea al compartir por primera vez, sin nombre ni correo. Con él se

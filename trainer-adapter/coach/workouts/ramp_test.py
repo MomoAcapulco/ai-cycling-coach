@@ -36,6 +36,7 @@ class RampTest:
         self.best_60s: Optional[float] = None
         self.ftp: Optional[int] = None
         self.max_hr: Optional[float] = None
+        self.saved = False           # «Guardar como mi FTP» (coach/history/ftp_log.py: the test was accepted)
 
     @property
     def running(self) -> bool:
@@ -45,7 +46,7 @@ class RampTest:
         """What the session summary keeps (session_<stamp>.json → «workout»)."""
         return {'type': 'RAMP_TEST', 'name': 'Test de FTP (rampa)', 'endReason': self.reason,
                 'best60sW': _round(self.best_60s), 'ftpW': self.ftp, 'maxHeartRate': self.max_hr,
-                'startW': self.start_w, 'stepW': self.step_w}
+                'startW': self.start_w, 'stepW': self.step_w, 'savedAsFtp': self.saved}
 
     # ---- clock ----
     def elapsed(self) -> float:

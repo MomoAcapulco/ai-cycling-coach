@@ -275,7 +275,15 @@ class AdapterRuntime:
             raise PermissionError('There is no FTP result to save')
         if self.profile_store is None:
             raise PermissionError('No rider profile store')
-        profile = self.profile_store.update({'ftpWatts': test.ftp})
+        profile = self.profile_store.update({'ftpWatts': test.ftp}, ftp_source='test')
+        test.saved = True                 # in the summary of its session, if that is still to be written…
+        session = self.session
+        if session is not None:           # …or in the database, if the session already finished
+            from coach.app import db
+            from coach.history.ftp_log import mark_test_accepted
+            path = db.migrate(self.env.history_db) if self.env.history_db else db.open_default()
+            for stem in {session.stem, (session.last_summary or {}).get('session')} - {None}:
+                mark_test_accepted(path, f'app:{stem}')
         self.profile_changed(profile)
         return {'ftpWatts': profile.ftp_watts}
 

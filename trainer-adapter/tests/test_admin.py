@@ -10,7 +10,6 @@ from urllib.request import Request, urlopen
 
 from coach.bluetooth.device_registry import DeviceRegistry
 from coach.bluetooth.discovery import Classified
-from coach.app.recordings_store import list_recordings, safe_filename, save_upload
 from coach.app.runtime import AdapterRuntime, EnvConfig
 from coach.app.server import make_server
 from coach.app.settings import Settings, SettingsStore
@@ -89,34 +88,6 @@ class SettingsTests(unittest.TestCase):
             self.assertEqual(store.saved(), {})
 
 
-class RecordingsTests(unittest.TestCase):
-    def test_upload_validates_and_never_overwrites(self):
-        with tempfile.TemporaryDirectory() as folder:
-            first = save_upload(Path(folder), 'my ride.csv', CSV.encode())
-            second = save_upload(Path(folder), 'my ride.csv', CSV.encode())
-            self.assertEqual((first['name'], second['name']), ('my_ride.csv', 'my_ride_1.csv'))
-            self.assertTrue(first['valid'])
-            self.assertEqual((first['samples'], first['durationSeconds']), (2, 2.0))
-            for name, data in (('x.txt', CSV.encode()), ('bad.csv', b'a,b\n1,2\n'), ('empty.csv', b''),
-                               ('bin.csv', b'\xff\xfe\x00'), ('../../etc.csv', b'nope')):
-                with self.subTest(name=name), self.assertRaises(ValueError):
-                    save_upload(Path(folder), name, data)
-            self.assertEqual({r['name'] for r in list_recordings(Path(folder))}, {'my_ride.csv', 'my_ride_1.csv'})
-            self.assertEqual([p.name for p in Path(folder).iterdir() if p.suffix != '.csv'], [])
-
-    def test_safe_filename(self):
-        self.assertEqual(safe_filename('../x/ride 1.CSV'), 'ride_1.CSV')
-        with self.assertRaises(ValueError):
-            safe_filename('...')
-
-    def test_invalid_files_are_listed_as_invalid(self):
-        with tempfile.TemporaryDirectory() as folder:
-            (Path(folder) / 'broken.csv').write_text('a,b\n')
-            [entry] = list_recordings(Path(folder))
-            self.assertFalse(entry['valid'])
-            self.assertTrue(entry['error'])
-
-
 class AdminServerTests(unittest.TestCase):
     """The real HTTP server around an AdapterRuntime without Bluetooth workers."""
 
@@ -173,16 +144,13 @@ class AdminServerTests(unittest.TestCase):
         self.assertEqual(self.call('GET', '/admin/settings')[1]['settings']['mode'], 'SIMULATOR')
         self.assertEqual(self.store.saved(), {})
 
-    def test_upload_then_replay_it(self):
-        status, info = self.call('POST', '/admin/recordings?name=nueva.csv', raw=CSV.encode(), content_type='text/csv')
-        self.assertEqual((status, info['name'], info['valid']), (201, 'nueva.csv', True))
-        listing = self.call('GET', '/admin/recordings')[1]['recordings']
-        self.assertIn('nueva.csv', [r['name'] for r in listing])
-        path = next(r['path'] for r in listing if r['name'] == 'nueva.csv')
-        self.assertEqual(self.call('POST', '/admin/settings', {'mode': 'REPLAY', 'replayFile': path})[0], 200)
-        with self.assertRaises(HTTPError) as ctx:
-            self.call('POST', '/admin/recordings?name=x.csv', raw=b'nope', content_type='text/csv')
-        self.assertEqual(ctx.exception.code, 400)
+    def test_replay_a_recording_of_the_folder_and_no_uploads(self):
+        # Replays are opened from Sessions or Routes; uploading a CSV from elsewhere is gone (17-11)
+        self.assertEqual(self.call('POST', '/admin/settings', {'mode': 'REPLAY', 'replayFile': 'ride.csv'})[0], 200)
+        for method, path in (('GET', '/admin/recordings'), ('POST', '/admin/recordings?name=x.csv')):
+            with self.subTest(path=path), self.assertRaises(HTTPError) as ctx:
+                self.call(method, path, raw=CSV.encode() if method == 'POST' else None, content_type='text/csv')
+            self.assertEqual(ctx.exception.code, 404)
 
     def test_describe(self):
         data = self.call('GET', '/admin/settings')[1]
