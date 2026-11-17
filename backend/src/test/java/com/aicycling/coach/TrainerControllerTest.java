@@ -170,6 +170,22 @@ class TrainerControllerTest {
     }
 
     @Test
+    void raceCalendarIsForwarded() throws Exception {
+        REPLIES.put("/calendar", new Reply(200, "{\"month\":\"2026-11\"}"));
+        mvc.perform(get("/api/trainer/calendar?month=2026-11"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.month").value("2026-11"));
+        assertThat(LAST_REQUEST.get("query")).isEqualTo("month=2026-11");
+        String id = "fa4e0000-0000-4000-8000-000000000001";   // a fake id (scripts/mask_personal_data.py)
+        REPLIES.put("/goals/" + id + "/result", new Reply(200, "{\"id\":\"" + id + "\"}"));
+        mvc.perform(post("/api/trainer/goals/" + id + "/result").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"finished\":true}"))
+                .andExpect(status().isOk());
+        assertThat(LAST_REQUEST.get("path")).isEqualTo("/goals/" + id + "/result");
+        assertThat(LAST_REQUEST.get("body")).isEqualTo("{\"finished\":true}");
+    }
+
+    @Test
     void deviceForgetIsForwardedAsDelete() throws Exception {
         REPLIES.put("/devices/zwift_left", new Reply(200, "{\"forgotten\":\"zwift_left\"}"));
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/trainer/devices/zwift_left"))

@@ -6,10 +6,10 @@ import { LoadSection } from '../components/LoadSection';
 import { RPE_LABELS, rpeColor } from '../components/EffortPicker';
 import { Pager } from '../components/Pager';
 
-const TYPE_LABEL: Record<ActivityType, string> = {
+export const TYPE_LABEL: Record<ActivityType, string> = {
   ride: 'Bici', virtual_ride: 'Rodillo / virtual', run: 'Carrera', strength: 'Fuerza', workout: 'Entrenamiento', other: 'Otro',
 };
-const TYPE_COLOR: Record<ActivityType, string> = {
+export const TYPE_COLOR: Record<ActivityType, string> = {
   ride: '#e9a15a', virtual_ride: '#6ce8af', run: '#7fb6ff', strength: '#c79bff', workout: '#aab5ff', other: '#8aa99e',
 };
 const ORDER: ActivityType[] = ['ride', 'virtual_ride', 'run', 'strength', 'workout', 'other'];

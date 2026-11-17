@@ -1,3 +1,4 @@
+import type { CalendarMonth, DayActivity, Goal, GoalKind, GoalResult } from './types';
 import type { ActiveRoute, Activity, HistoryWeek, LoadReport, RouteSummary, WorkoutLibrary, FtpAdvice, GeneratedRoute, SessionFeedback } from './types';
 import type { AdminState, DevicesState, ProfileState, RiderProfile, Session, SessionSummary, Settings, Telemetry } from './types';
 
@@ -53,7 +54,20 @@ export type Page = { total: number; limit: number | null; offset: number };
 export type RaceRef = Pick<RouteSummary, 'file' | 'name' | 'distanceKm' | 'elevationGainM' | 'maxGradePercent'>;
 export type RoutesPage = Page & { routes: RouteSummary[]; races: RaceRef[]; current: string | null; available: boolean };
 
+/** What is sent to save a race: a one-day race, or its stages (two or more). */
+export type StageInput = { name?: string | null; date: string; distanceKm?: number | null; gainM?: number | null; routeFile?: string | null };
+export type GoalInput = {
+  name: string; kind: GoalKind; priority: 'A' | 'B' | 'C'; eventDate?: string; distanceKm?: number | null; gainM?: number | null;
+  routeFile?: string | null; stages?: StageInput[] | null;
+};
+
 export const api = {
+  goals: () => request<{ goals: Goal[]; kinds: Record<GoalKind, string> }>('/goals'),
+  saveGoal: (goal: GoalInput, id?: string) => request<Goal>(id ? `/goals/${id}` : '/goals', json(goal)),
+  deleteGoal: (id: string) => request<{ deleted: string }>(`/goals/${id}`, { method: 'DELETE' }),
+  saveGoalResult: (id: string, result: Partial<GoalResult> & { stageNo?: number }) => request<Goal>(`/goals/${id}/result`, json(result)),
+  calendar: (month: string) => request<CalendarMonth>(`/calendar?month=${month}`),
+  dayActivities: (day: string) => request<{ activities: DayActivity[] }>(`/calendar/day?day=${day}`),
   telemetry: () => request<Telemetry>('/telemetry'),
   replaySession: () => request<Session>('/replay/session'),
   replayControl: (action: string, value?: number) => request('/replay/control', json({ action, value })),

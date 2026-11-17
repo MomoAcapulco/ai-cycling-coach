@@ -320,3 +320,19 @@ export type DevicesState = {
   pending?: Partial<Record<DeviceRole, DeviceCandidate[]>>;
   envFilters?: Partial<Record<DeviceRole, { id: string | null }>>;
 };
+
+/** The race calendar (coach/app/goals_store.py). */
+export type GoalKind = 'MTB_MARATHON' | 'MTB_STAGES' | 'MTB_ENDURANCE' | 'MTB_XC' | 'GRAVEL' | 'ROAD' | 'OTHER';
+export type GoalStage = {
+  id: string; stageNo: number; name: string | null; date: string; daysTo: number; distanceKm: number | null; gainM: number | null;
+  routeFile: string | null; routeName: string | null; result: GoalResult | null; needsResult: boolean;
+};
+export type GoalResult = { finished: boolean; timeSeconds: number | null; rpe: number | null; note: string | null; activityId: string | null };
+export type Goal = {
+  id: string; name: string; eventDate: string; kind: GoalKind; kindLabel: string; distanceKm: number | null; gainM: number | null;
+  priority: 'A' | 'B' | 'C'; status: 'planned' | 'done' | 'cancelled'; routeFile: string | null; routeName: string | null;
+  daysTo: number; endDate: string; daysToEnd: number; stages: GoalStage[]; needsResult: boolean; result: GoalResult | null;
+};
+export type RaceDay = { date: string; goalId: string; name: string; priority: 'A' | 'B' | 'C'; stageNo: number | null; stages: number };
+export type DayActivity = { id: string; type: string; name: string | null; seconds: number | null; distanceKm: number | null };
+export type CalendarMonth = { month: string; today: string; activities: Record<string, DayActivity[]>; goals: Goal[]; raceDays: RaceDay[] };

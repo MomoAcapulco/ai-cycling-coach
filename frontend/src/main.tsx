@@ -9,6 +9,7 @@ import { Sessions } from './pages/Sessions';
 import { Routes } from './pages/Routes';
 import { History } from './pages/History';
 import { Workouts } from './pages/Workouts';
+import { Calendar } from './pages/Calendar';
 import { Toasts } from './components/Toasts';
 
 
@@ -18,7 +19,7 @@ function App() {
   return (
     <main>
       <Header version={__APP_VERSION__} data={data} route={route} />
-      {route === 'ajustes' ? <Admin /> : route === 'sesiones' ? <Sessions /> : route === 'rutas' ? <Routes data={data} /> : route === 'historial' ? <History />
+      {route === 'ajustes' ? <Admin /> : route === 'sesiones' ? <Sessions /> : route === 'rutas' ? <Routes data={data} /> : route === 'historial' ? <History /> : route === 'calendario' ? <Calendar />
         : route === 'entrenamientos' ? <Workouts data={data} />
         : <Dashboard data={data} error={error} history={history} />}
       <Toasts />

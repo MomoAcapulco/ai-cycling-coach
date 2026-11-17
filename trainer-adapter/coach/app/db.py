@@ -221,7 +221,22 @@ def _v4(db: sqlite3.Connection):
     ''')
 
 
-MIGRATIONS = {1: _v1, 2: _v2, 3: _v3, 4: _v4}
+def _v5(db: sqlite3.Connection):
+    """Races in stages: each stage with its date and its GPX, and a result per stage (``stage_id``; empty for the
+    result of a one-day race)."""
+    _run_script(db, '''
+        CREATE TABLE goal_stages (
+            id TEXT PRIMARY KEY, goal_id TEXT NOT NULL REFERENCES goals(id) ON DELETE CASCADE,
+            stage_no INTEGER NOT NULL, name TEXT, stage_date TEXT NOT NULL,
+            distance_m REAL, gain_m REAL, route_id TEXT REFERENCES routes(id),
+            UNIQUE (goal_id, stage_no)
+        );
+        ALTER TABLE event_results ADD COLUMN stage_id TEXT REFERENCES goal_stages(id) ON DELETE CASCADE;
+        CREATE INDEX goal_stages_date ON goal_stages(stage_date)
+    ''')
+
+
+MIGRATIONS = {1: _v1, 2: _v2, 3: _v3, 4: _v4, 5: _v5}
 SCHEMA_VERSION = max(MIGRATIONS)
 
 

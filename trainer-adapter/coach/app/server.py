@@ -296,6 +296,22 @@ class Handler(BaseHTTPRequestHandler):
         if path in ('/history', '/history/weeks') and self.admin is not None:
             self.respond(self.history_json(path.endswith('/weeks')))
             return
+        if path in ('/goals', '/calendar', '/calendar/day') and self.admin is not None:
+            # the race calendar (coach/app/goals_store.py)
+            from coach.app.goals_store import KINDS, GoalsStore
+            store = GoalsStore(self.admin.env.history_db)
+            query = parse_qs(urlsplit(self.path).query)
+            try:
+                if path == '/goals':
+                    self.respond({'goals': store.list(), 'kinds': KINDS})
+                elif path == '/calendar':
+                    from datetime import datetime
+                    self.respond(store.month((query.get('month') or [datetime.now().strftime('%Y-%m')])[0]))
+                else:
+                    self.respond({'activities': store.activities_on((query.get('day') or [''])[0])})
+            except ValueError as exc:
+                self.send_error(400, str(exc))
+            return
         if path == '/workout/library' and self.admin is not None:
             self.respond(self.admin.workout_library())
             return
@@ -539,6 +555,21 @@ class Handler(BaseHTTPRequestHandler):
                 self.respond({'profile': profile.to_json(), 'saved': True,
                               'profileFile': str(self.admin.profile_store.path)})
                 return
+            goal = re.fullmatch(r'/goals(?:/([0-9a-f-]{36})(/result)?)?', path)
+            if goal and self.admin is not None:
+                from coach.app.goals_store import GoalsStore
+                store = GoalsStore(self.admin.env.history_db)
+                goal_id, result = goal.group(1), goal.group(2)
+                try:
+                    if goal_id is None:
+                        self.respond(store.create(self.read_json()), 201)
+                    elif result:
+                        self.respond(store.save_result(goal_id, self.read_json()))
+                    else:
+                        self.respond(store.update(goal_id, self.read_json()))
+                except KeyError:
+                    self.send_error(404, 'No such event')
+                return
             if path == '/admin/settings/reset' and self.admin is not None:
                 self.respond(self.admin.reset_to_env())
                 return
@@ -701,6 +732,15 @@ class Handler(BaseHTTPRequestHandler):
         path = self.route()
         if self.admin is not None and (path.startswith('/routes/') or path.startswith('/sessions/')):
             self.delete_file(path)
+            return
+        goal = re.fullmatch(r'/goals/([0-9a-f-]{36})', path)
+        if goal and self.admin is not None:
+            from coach.app.goals_store import GoalsStore
+            try:
+                GoalsStore(self.admin.env.history_db).delete(goal.group(1))
+                self.respond({'deleted': goal.group(1)})
+            except KeyError:
+                self.send_error(404, 'No such event')
             return
         prefix = '/devices/'
         role = path[len(prefix):] if path.startswith(prefix) else None

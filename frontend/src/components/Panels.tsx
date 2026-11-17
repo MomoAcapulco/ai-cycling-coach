@@ -21,6 +21,7 @@ export function Header({ version, data, route }: { version: string; data: Teleme
         <a href="#/" className={route === 'panel' ? 'active' : ''}>Panel</a>
         <a href="#/entrenamientos" className={route === 'entrenamientos' ? 'active' : ''}>Entrenamientos</a>
         <a href="#/rutas" className={route === 'rutas' ? 'active' : ''}>Rutas</a>
+        <a href="#/calendario" className={route === 'calendario' ? 'active' : ''}>Calendario</a>
         <a href="#/sesiones" className={route === 'sesiones' ? 'active' : ''}>Sesiones</a>
         <a href="#/historial" className={route === 'historial' ? 'active' : ''}>Historial</a>
         <a href="#/ajustes" className={route === 'ajustes' ? 'active' : ''}>Ajustes</a>
